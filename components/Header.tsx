@@ -6,7 +6,7 @@ const Header: React.FC = () => {
   return (
     <header className="bg-gray-900/80 backdrop-blur-md sticky top-0 z-50 shadow-lg">
       <div className="container mx-auto px-4 py-4 flex justify-end items-center"> {/* Changed justify-between to justify-end */}
-        {/* Logo removed from here */}
+        {/* Logo/Title removed */}
         <nav className="flex items-center space-x-4">
           {SOCIAL_LINKS.map((link) => (
             <a
