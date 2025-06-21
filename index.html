@@ -33,44 +33,34 @@
     .custom-slider-thumb::-webkit-slider-thumb {
       -webkit-appearance: none;
       appearance: none;
-      width: 32px; /* Increased size for the new image */
-      height: 32px; /* Increased size for the new image */
-      background-image: url('https://i.imgur.com/zCLTodn.png'); /* Updated image URL */
-      background-color: transparent; /* Explicitly set for transparency */
-      background-repeat: no-repeat;
-      background-position: center;
-      background-size: contain; /* Ensure the image fits well */
+      width: 32px;
+      height: 32px;
+      background: transparent url('https://i.imgur.com/zCLTodn.png') center center / contain no-repeat;
       cursor: pointer;
       border: none;
-      margin-top: -10px; /* Adjusted from -14px to make the thumb visually lower */
+      margin-top: -10px;
     }
 
     .custom-slider-thumb::-moz-range-thumb {
-      width: 32px; /* Increased size for the new image */
-      height: 32px; /* Increased size for the new image */
-      background-image: url('https://i.imgur.com/zCLTodn.png'); /* Updated image URL */
-      background-color: transparent; /* Explicitly set for transparency */
-      background-repeat: no-repeat;
-      background-position: center;
-      background-size: contain; /* Ensure the image fits well */
+      width: 32px;
+      height: 32px;
+      background: transparent url('https://i.imgur.com/zCLTodn.png') center center / contain no-repeat;
       cursor: pointer;
-      border: none;
-      border-radius: 0; /* Keeps thumb shape as defined by image */
-      margin-top: -10px; /* Adjusted from -14px for consistency, making it visually lower */
+      border: none; /* Resetting border for Firefox */
+      border-radius: 0; /* Ensures image dictates shape */
+      margin-top: -10px;
     }
 
     .custom-slider-thumb:disabled::-webkit-slider-thumb {
-      background-image: url('https://i.imgur.com/zCLTodn.png'); /* Updated image URL */
-      background-color: transparent; /* Explicitly set for transparency */
-      filter: grayscale(100%); /* Grayscale overrides other filters for disabled state */
+      background: transparent url('https://i.imgur.com/zCLTodn.png') center center / contain no-repeat;
+      filter: grayscale(100%);
       opacity: 0.6;
       cursor: not-allowed;
     }
 
     .custom-slider-thumb:disabled::-moz-range-thumb {
-      background-image: url('https://i.imgur.com/zCLTodn.png'); /* Updated image URL */
-      background-color: transparent; /* Explicitly set for transparency */
-      filter: grayscale(100%); /* Grayscale overrides other filters for disabled state */
+      background: transparent url('https://i.imgur.com/zCLTodn.png') center center / contain no-repeat;
+      filter: grayscale(100%);
       opacity: 0.6;
       cursor: not-allowed;
     }
