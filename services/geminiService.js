@@ -66,8 +66,8 @@ export const generateGameWithGemini = async (params) => { // options renamed to 
     const ruleLines = [];
     let foundFirstRule = false;
 
-    const rulePattern = /^\s*(\d+)\.\s*(.+)/; // Captures number and content
-    const inlineRulePattern = /(.*?)(\b\d+\.\s+.+)/; // For title ending and rule starting on same line
+    const rulePattern = /^\s*(\d+)\.\s*(.+)/; 
+    const inlineRulePattern = /(.*?)(\b\d+\.\s*.+)/; 
 
 
     for (const rawLine of rawLines) {
@@ -76,19 +76,24 @@ export const generateGameWithGemini = async (params) => { // options renamed to 
 
       if (foundFirstRule) {
         const match = currentLine.match(rulePattern);
-        if (match && match[2]) {
+        if (match && typeof match[2] === 'string') {
           ruleLines.push(match[2].trim());
+        } else if (match) {
+            console.warn("Rule pattern matched within rules block, but capture group 2 is not a string:", currentLine, match);
         } else {
            console.warn("Non-rule line found within rules block (or malformed rule):", currentLine);
         }
       } else {
         const startsWithRuleMatch = currentLine.match(rulePattern);
-        if (startsWithRuleMatch && startsWithRuleMatch[2]) {
+        if (startsWithRuleMatch && typeof startsWithRuleMatch[2] === 'string') {
           foundFirstRule = true;
           ruleLines.push(startsWithRuleMatch[2].trim());
+        } else if (startsWithRuleMatch) {
+            console.warn("startsWithRuleMatch pattern matched, but capture group 2 is not a string:", currentLine, startsWithRuleMatch);
+            titleParts.push(currentLine); 
         } else {
           const inlineMatch = currentLine.match(inlineRulePattern);
-          if (inlineMatch && inlineMatch[1] !== undefined && inlineMatch[2]) {
+          if (inlineMatch && typeof inlineMatch[1] === 'string' && typeof inlineMatch[2] === 'string') {
             const titleCandidate = inlineMatch[1].trim();
             const ruleFullText = inlineMatch[2].trim();
 
@@ -97,20 +102,23 @@ export const generateGameWithGemini = async (params) => { // options renamed to 
             }
 
             const firstRuleContentMatch = ruleFullText.match(rulePattern);
-            if (firstRuleContentMatch && firstRuleContentMatch[2]) {
+            if (firstRuleContentMatch && typeof firstRuleContentMatch[2] === 'string') {
               ruleLines.push(firstRuleContentMatch[2].trim());
               foundFirstRule = true;
             } else {
-              titleParts.push(currentLine);
-               console.warn("Malformed inline rule, treating as title:", currentLine);
+              titleParts.push(currentLine); 
+              console.warn("Malformed inline rule content, treating original line as title:", currentLine);
             }
+          } else if (inlineMatch) {
+              titleParts.push(currentLine);
+              console.warn("Inline pattern matched but capture groups are not as expected (e.g. not strings), treating as title:", currentLine, inlineMatch);
           } else {
             titleParts.push(currentLine);
           }
         }
       }
     }
-    
+
     if (ruleLines.length > 0) {
       let gameTitle;
       const potentialTitle = titleParts.join(' ').trim();
@@ -147,13 +155,13 @@ export const generateGameWithGemini = async (params) => { // options renamed to 
     console.error("Could not parse game from webhook response:", responseText.substring(0, 200));
     throw new Error(`The game generator returned an unparsable format. Response snippet: ${responseText.substring(0, 150)}...`);
   }
-  
+
   if (!generatedGame.title || !Array.isArray(generatedGame.rules) || generatedGame.rules.length === 0) {
     console.error("Parsed/constructed game is missing essential fields or has no rules:", generatedGame);
     throw new Error("The game generator returned an incomplete game structure. Try adjusting your options or rephrasing the activity.");
   }
 
-  if (params.includeDares) { 
+  if (params.includeDares) {
     if (!Array.isArray(generatedGame.dares)) {
       console.warn("Dares were requested, but 'dares' field was not a valid array in the response. Defaulting to empty dares list.");
       generatedGame.dares = [];

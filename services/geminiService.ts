@@ -69,8 +69,8 @@ export const generateGameWithGemini = async (params: GameGenerationParams): Prom
     const ruleLines: string[] = [];
     let foundFirstRule = false;
 
-    const rulePattern = /^\s*(\d+)\.\s*(.+)/; // Captures number and content
-    const inlineRulePattern = /(.*?)(\b\d+\.\s+.+)/; // For title ending and rule starting on same line
+    const rulePattern = /^\s*(\d+)\.\s*(.+)/; 
+    const inlineRulePattern = /(.*?)(\b\d+\.\s*.+)/; 
 
     for (const rawLine of rawLines) {
       const currentLine = rawLine.trim();
@@ -78,24 +78,25 @@ export const generateGameWithGemini = async (params: GameGenerationParams): Prom
 
       if (foundFirstRule) {
         const match = currentLine.match(rulePattern);
-        if (match && match[2]) {
+        if (match && typeof match[2] === 'string') {
           ruleLines.push(match[2].trim());
+        } else if (match) {
+            console.warn("Rule pattern matched within rules block, but capture group 2 is not a string:", currentLine, match);
+             // Optionally, attempt to use match[0] or part of it if appropriate, or just skip
         } else {
-          // Line in rules block not matching rule_pattern, could append to previous or log
            console.warn("Non-rule line found within rules block (or malformed rule):", currentLine);
         }
       } else {
-        // We haven't found the first rule yet. This line could be title, or start rules.
         const startsWithRuleMatch = currentLine.match(rulePattern);
-        if (startsWithRuleMatch && startsWithRuleMatch[2]) {
-          // This line STARTS with a rule
+        if (startsWithRuleMatch && typeof startsWithRuleMatch[2] === 'string') {
           foundFirstRule = true;
           ruleLines.push(startsWithRuleMatch[2].trim());
+        } else if (startsWithRuleMatch) {
+            console.warn("startsWithRuleMatch pattern matched, but capture group 2 is not a string:", currentLine, startsWithRuleMatch);
+            titleParts.push(currentLine); // Treat as title if rule part is malformed
         } else {
-          // This line does not START with a rule. Check for inline rule.
           const inlineMatch = currentLine.match(inlineRulePattern);
-          if (inlineMatch && inlineMatch[1] !== undefined && inlineMatch[2]) {
-            // Line contains a title part and then a rule part
+          if (inlineMatch && typeof inlineMatch[1] === 'string' && typeof inlineMatch[2] === 'string') {
             const titleCandidate = inlineMatch[1].trim();
             const ruleFullText = inlineMatch[2].trim();
 
@@ -103,18 +104,18 @@ export const generateGameWithGemini = async (params: GameGenerationParams): Prom
               titleParts.push(titleCandidate);
             }
 
-            // Re-check the extracted rule part with the standard rulePattern
             const firstRuleContentMatch = ruleFullText.match(rulePattern);
-            if (firstRuleContentMatch && firstRuleContentMatch[2]) {
+            if (firstRuleContentMatch && typeof firstRuleContentMatch[2] === 'string') {
               ruleLines.push(firstRuleContentMatch[2].trim());
               foundFirstRule = true;
             } else {
-              // Rule part was malformed, treat whole original line as title.
-              titleParts.push(currentLine);
-               console.warn("Malformed inline rule, treating as title:", currentLine);
+              titleParts.push(currentLine); 
+              console.warn("Malformed inline rule content, treating original line as title:", currentLine);
             }
+          } else if (inlineMatch) {
+              titleParts.push(currentLine);
+              console.warn("Inline pattern matched but capture groups are not as expected (e.g. not strings), treating as title:", currentLine, inlineMatch);
           } else {
-            // No inline rule, this whole line is a title part
             titleParts.push(currentLine);
           }
         }
@@ -149,13 +150,12 @@ export const generateGameWithGemini = async (params: GameGenerationParams): Prom
         console.warn("Dares were requested, but the webhook returned a plain text list of rules. Dares section will be empty. For dares, the webhook should return structured JSON.");
       }
     } else if (titleParts.join('').trim().length > 0) {
-        // Only title was found, no rules.
         console.warn(`Plain text response had a potential title "${titleParts.join(' ')}" but no parsable rules found. Discarding.`);
     }
   }
 
   if (!generatedGame) {
-    console.error("Could not parse game from webhook response:", responseText.substring(0, 200)); // Log more of the response
+    console.error("Could not parse game from webhook response:", responseText.substring(0, 200));
     throw new Error(`The game generator returned an unparsable format. Response snippet: ${responseText.substring(0, 150)}...`);
   }
 
