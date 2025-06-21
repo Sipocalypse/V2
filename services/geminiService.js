@@ -7,6 +7,12 @@ const GAME_GENERATOR_WEBHOOK_URL = 'https://hook.eu2.make.com/8ym052altan60ddmek
 // Interface GameGenerationParams (from TS) would be conceptually:
 // { activity: string, chaosLevel: number, includeDares: boolean, numberOfRules: number }
 
+// Helper function to escape special characters for use in a regular expression
+function escapeRegExp(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+}
+
+
 export const generateGameWithGemini = async (params) => { // options renamed to params
   if (!params.activity || params.activity.trim() === "") {
     throw new Error("Activity must be provided to generate a game.");
@@ -121,7 +127,18 @@ export const generateGameWithGemini = async (params) => { // options renamed to 
 
     if (ruleLines.length > 0) {
       let gameTitle;
-      const potentialTitle = titleParts.join(' ').trim();
+      let potentialTitle = titleParts.join(' ').trim();
+
+      // Heuristic: If potentialTitle is exactly the activity name repeated twice, reduce it.
+      if (params.activity && params.activity.trim().length > 0) {
+        const singleActivity = params.activity.trim();
+        const doubleActivityPattern = new RegExp(`^${escapeRegExp(singleActivity)}\\s+${escapeRegExp(singleActivity)}$`, 'i');
+        if (doubleActivityPattern.test(potentialTitle)) {
+          console.warn(`Sanitizing title: Detected doubled activity name "${potentialTitle}". Reducing to "${singleActivity}".`);
+          potentialTitle = singleActivity;
+        }
+      }
+      
 
       if (potentialTitle.length > 0) {
         gameTitle = potentialTitle;
@@ -167,7 +184,7 @@ export const generateGameWithGemini = async (params) => { // options renamed to 
       generatedGame.dares = [];
     }
   } else {
-    generatedGame.dares = [];
+    generatedGame.dares = []; // Ensure dares is an empty array if not included
   }
   
   return generatedGame;

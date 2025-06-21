@@ -10,6 +10,11 @@ interface GameGenerationParams {
   numberOfRules: number;
 }
 
+// Helper function to escape special characters for use in a regular expression
+function escapeRegExp(string: string): string {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+}
+
 export const generateGameWithGemini = async (params: GameGenerationParams): Promise<GeneratedGame> => {
   if (!params.activity || params.activity.trim() === "") {
     throw new Error("Activity must be provided to generate a game.");
@@ -82,7 +87,6 @@ export const generateGameWithGemini = async (params: GameGenerationParams): Prom
           ruleLines.push(match[2].trim());
         } else if (match) {
             console.warn("Rule pattern matched within rules block, but capture group 2 is not a string:", currentLine, match);
-             // Optionally, attempt to use match[0] or part of it if appropriate, or just skip
         } else {
            console.warn("Non-rule line found within rules block (or malformed rule):", currentLine);
         }
@@ -93,7 +97,7 @@ export const generateGameWithGemini = async (params: GameGenerationParams): Prom
           ruleLines.push(startsWithRuleMatch[2].trim());
         } else if (startsWithRuleMatch) {
             console.warn("startsWithRuleMatch pattern matched, but capture group 2 is not a string:", currentLine, startsWithRuleMatch);
-            titleParts.push(currentLine); // Treat as title if rule part is malformed
+            titleParts.push(currentLine); 
         } else {
           const inlineMatch = currentLine.match(inlineRulePattern);
           if (inlineMatch && typeof inlineMatch[1] === 'string' && typeof inlineMatch[2] === 'string') {
@@ -124,7 +128,18 @@ export const generateGameWithGemini = async (params: GameGenerationParams): Prom
 
     if (ruleLines.length > 0) {
       let gameTitle: string;
-      const potentialTitle = titleParts.join(' ').trim();
+      let potentialTitle = titleParts.join(' ').trim();
+
+      // Heuristic: If potentialTitle is exactly the activity name repeated twice, reduce it.
+      if (params.activity && params.activity.trim().length > 0) {
+        const singleActivity = params.activity.trim();
+        // Regex to match "Activity Activity" case-insensitively
+        const doubleActivityPattern = new RegExp(`^${escapeRegExp(singleActivity)}\\s+${escapeRegExp(singleActivity)}$`, 'i');
+        if (doubleActivityPattern.test(potentialTitle)) {
+          console.warn(`Sanitizing title: Detected doubled activity name "${potentialTitle}". Reducing to "${singleActivity}".`);
+          potentialTitle = singleActivity;
+        }
+      }
 
       if (potentialTitle.length > 0) {
         gameTitle = potentialTitle;
@@ -134,7 +149,7 @@ export const generateGameWithGemini = async (params: GameGenerationParams): Prom
         if (gameTitle.length > 70) { 
           gameTitle = `Sipocalypse Game for '${params.activity.substring(0, 30)}...'`;
         }
-        if (params.activity.trim() === "") {
+        if (params.activity.trim() === "") { // Should have been caught earlier, but defensive
           gameTitle = "Generated Sipocalypse Game";
         }
       }
@@ -170,7 +185,7 @@ export const generateGameWithGemini = async (params: GameGenerationParams): Prom
       generatedGame.dares = [];
     }
   } else {
-    generatedGame.dares = [];
+    generatedGame.dares = []; // Ensure dares is an empty array if not included
   }
   
   return generatedGame;
