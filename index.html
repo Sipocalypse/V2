@@ -4,6 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sipocalypse Fun</title>
+  <!-- Minimal process object shim -->
+  <script>
+    if (typeof window.process === 'undefined') {
+      window.process = { 
+        env: {}, 
+        browser: true, 
+        version: '', 
+        versions: {} 
+      };
+      console.log('Minimal "process" object shim created for browser compatibility.');
+    }
+  </script>
   <!-- Add your favicon link here, e.g., <link rel="icon" href="/favicon.ico" /> -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
