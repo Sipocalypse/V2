@@ -36,19 +36,20 @@
       width: 32px; /* Increased size for the new image */
       height: 32px; /* Increased size for the new image */
       background-image: url('https://i.imgur.com/zCLTodn.png'); /* Updated image URL */
+      background-color: transparent; /* Explicitly set for transparency */
       background-repeat: no-repeat;
       background-position: center;
       background-size: contain; /* Ensure the image fits well */
       cursor: pointer;
       border: none;
       margin-top: -10px; /* Adjusted from -14px to make the thumb visually lower */
-      /* filter: hue-rotate(-90deg) saturate(1.8) brightness(1.05); Removed filter to show original image color */
     }
 
     .custom-slider-thumb::-moz-range-thumb {
       width: 32px; /* Increased size for the new image */
       height: 32px; /* Increased size for the new image */
       background-image: url('https://i.imgur.com/zCLTodn.png'); /* Updated image URL */
+      background-color: transparent; /* Explicitly set for transparency */
       background-repeat: no-repeat;
       background-position: center;
       background-size: contain; /* Ensure the image fits well */
@@ -56,11 +57,11 @@
       border: none;
       border-radius: 0; /* Keeps thumb shape as defined by image */
       margin-top: -10px; /* Adjusted from -14px for consistency, making it visually lower */
-      /* filter: hue-rotate(-90deg) saturate(1.8) brightness(1.05); Removed filter to show original image color */
     }
 
     .custom-slider-thumb:disabled::-webkit-slider-thumb {
       background-image: url('https://i.imgur.com/zCLTodn.png'); /* Updated image URL */
+      background-color: transparent; /* Explicitly set for transparency */
       filter: grayscale(100%); /* Grayscale overrides other filters for disabled state */
       opacity: 0.6;
       cursor: not-allowed;
@@ -68,6 +69,7 @@
 
     .custom-slider-thumb:disabled::-moz-range-thumb {
       background-image: url('https://i.imgur.com/zCLTodn.png'); /* Updated image URL */
+      background-color: transparent; /* Explicitly set for transparency */
       filter: grayscale(100%); /* Grayscale overrides other filters for disabled state */
       opacity: 0.6;
       cursor: not-allowed;
