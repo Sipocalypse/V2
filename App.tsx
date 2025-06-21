@@ -59,9 +59,19 @@ const App: React.FC = () => {
 
   return (
     <div className="bg-transparent text-gray-100 min-h-screen flex flex-col selection:bg-purple-500 selection:text-white">
-      <Header />
-      {showHero && <Hero />}
-      <main className="flex-grow relative z-10"> {/* Ensure main content is layered correctly */}
+      {/* Global Background Layer */}
+      <div className="fixed inset-0 z-0">
+        <img
+          src="https://i.imgur.com/5EqDvlN.jpeg"
+          alt="Abstract party background"
+          className="w-full h-full object-cover opacity-90"
+        />
+        <div className="absolute inset-0 bg-black/10"></div>
+      </div>
+
+      <Header /> {/* Header is sticky and has z-50 */}
+      {showHero && <Hero />} {/* Hero content will be on top of the global background */}
+      <main className="flex-grow relative z-10"> {/* Ensure main content is layered correctly above background */}
         {pageContent}
       </main>
       <Footer />

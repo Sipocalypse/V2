@@ -38,6 +38,7 @@ export interface TextInputProps {
   placeholder?: string;
   type?: string;
   disabled?: boolean;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void; // Added onKeyDown
 }
 
 export interface SliderInputProps {

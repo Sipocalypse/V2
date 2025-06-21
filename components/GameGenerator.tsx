@@ -66,6 +66,13 @@ const GameGenerator: React.FC = () => {
     }
   }, [options, resetCocktailForm]);
 
+  const handleActivityKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter' && options.activity.trim() && !isLoading) {
+      event.preventDefault(); // Prevent any default form submission behavior
+      handleGenerateGame();
+    }
+  };
+
 
   const sendCocktailRequestToWebhook = async (activity: string, email: string): Promise<void> => {
     const payload = { activity, email };
@@ -135,8 +142,9 @@ const GameGenerator: React.FC = () => {
           label="What are you doing?"
           value={options.activity}
           onChange={(e) => handleInputChange('activity', e.target.value)}
-          placeholder="e.g., Watching a movie, Playing video games, Pre-drinks"
+          placeholder="e.g., At a funeral, In the gym, During a boring meeting"
           disabled={isLoading}
+          onKeyDown={handleActivityKeyDown} // Added onKeyDown handler
         />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <SelectInput
