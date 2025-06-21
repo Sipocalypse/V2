@@ -14,9 +14,7 @@ export const MIN_RULES = 1;
 export const MAX_RULES = 11;
 export const DEFAULT_RULES = 5;
 
-// Gemini API Model
-export const API_MODEL_NAME = 'gemini-2.5-flash-preview-04-17';
-
+// Funny activity examples for placeholder - This was already in your constants.js so keeping it.
 export const FUNNY_ACTIVITY_EXAMPLES = [
   "Attending a taxidermy convention",
   "Trying to assemble IKEA furniture... blindfolded",

@@ -14,8 +14,21 @@ export const MIN_RULES = 1;
 export const MAX_RULES = 11;
 export const DEFAULT_RULES = 5;
 
-// Gemini API Model
-export const API_MODEL_NAME = 'gemini-2.5-flash-preview-04-17';
+// Funny activity examples for placeholder
+export const FUNNY_ACTIVITY_EXAMPLES: string[] = [
+  "Attending a taxidermy convention",
+  "Trying to assemble IKEA furniture... blindfolded",
+  "Competitive thumb wrestling with a ghost",
+  "Explaining cryptocurrency to a confused cat",
+  "Synchronized swimming in a bathtub",
+  "A very serious game of rock, paper, scissors",
+  "Debating the philosophical implications of a pop tart",
+  "Waiting for the microwave to hit 0:00",
+  "Trying to fold a fitted sheet correctly",
+  "Staring contest with a pigeon",
+  "Parallel parking a unicycle",
+  "A dramatic reading of appliance manuals"
+];
 
 
 export const SOCIAL_LINKS: SocialLink[] = [

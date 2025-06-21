@@ -1,93 +1,166 @@
 
-import { GoogleGenAI } from "@google/genai";
-// import { GameOptions, GeneratedGame } from '../types.js'; // Types are erased
-import { API_MODEL_NAME } from '../constants.js';
+// import { GoogleGenAI } from "@google/genai"; // Removed
+// import { API_MODEL_NAME } from '../constants.js'; // Removed
 
-const constructPrompt = (options) => {
-  let prompt = `Generate a creative and fun drinking game titled based on the activity: "${options.activity}".\n`;
-  prompt += `The game should have exactly ${options.numberOfRules} rules.\n`;
-  prompt += `The chaos level should be: "${options.chaosLevel}". Examples for chaos levels are "Initial Sips", "Rising Revelry", "Pre-Apocalyptic Party", or "Sipocalypse Level Event".\n`;
-  
-  if (options.includeDares) {
-    prompt += `Include a section with 3-5 example dares relevant to the activity and chaos level.\n`;
-  } else {
-    prompt += `Do not include any dares.\n`;
-  }
+const GAME_GENERATOR_WEBHOOK_URL = 'https://hook.eu2.make.com/8ym052altan60ddmeki1zl2160f1ghxr';
 
-  prompt += `The output should be a JSON object with the following structure:
-{
-  "title": "Clear and Engaging Game Title",
-  "rules": ["Rule 1 text...", "Rule 2 text...", ...],
-  "dares": ["Dare 1 text...", "Dare 2 text...", ...]
-}
-If dares are not requested, the "dares" array should be empty.
-The title should be catchy and related to the activity.
-The rules should be clear, concise, and easy to follow.
-The rules and dares should be directly related to the specified activity and chaos level.
-Ensure the number of rules matches exactly ${options.numberOfRules}.
-Do not wrap the JSON in markdown code fences.
-`;
-  return prompt;
-};
+// Interface GameGenerationParams (from TS) would be conceptually:
+// { activity: string, chaosLevel: number, includeDares: boolean, numberOfRules: number }
 
-export const generateGameWithGemini = async (options) => {
-  if (!process.env.API_KEY) {
-    console.error("API_KEY is not configured.");
-    throw new Error("Game generation service is not configured (API key missing). Please contact support.");
-  }
-  if (!options.activity || options.activity.trim() === "") {
+export const generateGameWithGemini = async (params) => { // options renamed to params
+  if (!params.activity || params.activity.trim() === "") {
     throw new Error("Activity must be provided to generate a game.");
   }
 
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const prompt = constructPrompt(options);
-
+  let response;
   try {
-    const response = await ai.models.generateContent({
-      model: API_MODEL_NAME,
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
+    console.log("Sending to webhook. Payload:", JSON.stringify(params)); 
+    response = await fetch(GAME_GENERATOR_WEBHOOK_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify(params), 
     });
+  } catch (networkError) {
+    console.error("Network error calling webhook:", networkError);
+    throw new Error(`Failed to connect to the game generator: ${networkError.message}. Please check your internet connection.`);
+  }
 
-    let jsonStr = response.text.trim();
-    const fenceRegex = /^\`\`\`(\w*)?\s*\n?(.*?)\n?\s*\`\`\`$/s;
-    const match = jsonStr.match(fenceRegex);
-    if (match && match[2]) {
-      jsonStr = match[2].trim();
-    }
-    
-    console.log("Raw JSON string from AI:", jsonStr);
-    
-    const generatedGame = JSON.parse(jsonStr);
-
-    if (!generatedGame.title || !Array.isArray(generatedGame.rules) || generatedGame.rules.length === 0) {
-      console.error("Parsed JSON does not match expected GeneratedGame structure or is missing essential fields:", generatedGame);
-      throw new Error("The AI returned an unexpected game format. The game might not be related to your activity or is incomplete. Try adjusting your options or rephrasing the activity.");
-    }
-
-    if (options.includeDares) {
-      if (!Array.isArray(generatedGame.dares)) {
-        generatedGame.dares = []; 
+  if (!response.ok) {
+    let errorDetails = `Webhook request failed with status: ${response.status}`;
+    try {
+      const errorText = await response.text();
+      if (errorText) {
+        errorDetails += ` - ${errorText}`;
       }
+    } catch (e) {
+      // Ignore error from parsing response text if response is not ok
+    }
+    console.error(errorDetails);
+    throw new Error(errorDetails);
+  }
+
+  const responseText = await response.text();
+  let generatedGame = null;
+
+  // Attempt to parse as JSON first
+  try {
+    const parsedJson = JSON.parse(responseText);
+    if (parsedJson && typeof parsedJson.title === 'string' && Array.isArray(parsedJson.rules)) {
+      generatedGame = parsedJson;
     } else {
+        console.warn("Parsed JSON, but it does not match expected GeneratedGame structure:", parsedJson);
+    }
+  } catch (parseError) {
+    console.log("Failed to parse JSON response from webhook. Will attempt plain text parsing. Error:", parseError.message);
+    const trimmedResponseText = responseText.trim().toLowerCase();
+    if (trimmedResponseText === "accepted") {
+      console.error("Webhook returned 'Accepted' instead of game data.");
+      throw new Error("The game generator acknowledged the request but didn't return a game. Please check your Make.com scenario configuration or try again.");
+    }
+
+    // Advanced plain text parsing
+    const rawLines = responseText.split('\n');
+    const titleParts = [];
+    const ruleLines = [];
+    let foundFirstRule = false;
+
+    const rulePattern = /^\s*(\d+)\.\s*(.+)/; // Captures number and content
+    const inlineRulePattern = /(.*?)(\b\d+\.\s+.+)/; // For title ending and rule starting on same line
+
+
+    for (const rawLine of rawLines) {
+      const currentLine = rawLine.trim();
+      if (currentLine.length === 0) continue;
+
+      if (foundFirstRule) {
+        const match = currentLine.match(rulePattern);
+        if (match && match[2]) {
+          ruleLines.push(match[2].trim());
+        } else {
+           console.warn("Non-rule line found within rules block (or malformed rule):", currentLine);
+        }
+      } else {
+        const startsWithRuleMatch = currentLine.match(rulePattern);
+        if (startsWithRuleMatch && startsWithRuleMatch[2]) {
+          foundFirstRule = true;
+          ruleLines.push(startsWithRuleMatch[2].trim());
+        } else {
+          const inlineMatch = currentLine.match(inlineRulePattern);
+          if (inlineMatch && inlineMatch[1] !== undefined && inlineMatch[2]) {
+            const titleCandidate = inlineMatch[1].trim();
+            const ruleFullText = inlineMatch[2].trim();
+
+            if (titleCandidate.length > 0) {
+              titleParts.push(titleCandidate);
+            }
+
+            const firstRuleContentMatch = ruleFullText.match(rulePattern);
+            if (firstRuleContentMatch && firstRuleContentMatch[2]) {
+              ruleLines.push(firstRuleContentMatch[2].trim());
+              foundFirstRule = true;
+            } else {
+              titleParts.push(currentLine);
+               console.warn("Malformed inline rule, treating as title:", currentLine);
+            }
+          } else {
+            titleParts.push(currentLine);
+          }
+        }
+      }
+    }
+    
+    if (ruleLines.length > 0) {
+      let gameTitle;
+      const potentialTitle = titleParts.join(' ').trim();
+
+      if (potentialTitle.length > 0) {
+        gameTitle = potentialTitle;
+      } else {
+        console.warn("Webhook returned plain text rules without a clear title. Generating title based on activity.");
+        gameTitle = `Sipocalypse Game for '${params.activity}'`;
+        if (gameTitle.length > 70) { 
+          gameTitle = `Sipocalypse Game for '${params.activity.substring(0, 30)}...'`;
+        }
+        if (params.activity.trim() === "") {
+          gameTitle = "Generated Sipocalypse Game";
+        }
+      }
+      
+      generatedGame = {
+        title: gameTitle,
+        rules: ruleLines,
+        dares: [], 
+      };
+      console.log("Constructed game object from plain text:", generatedGame);
+      
+      if (params.includeDares) {
+        console.warn("Dares were requested, but the webhook returned a plain text list of rules. Dares section will be empty. For dares, the webhook should return structured JSON.");
+      }
+    } else if (titleParts.join('').trim().length > 0) {
+        console.warn(`Plain text response had a potential title "${titleParts.join(' ')}" but no parsable rules found. Discarding.`);
+    }
+  }
+
+  if (!generatedGame) {
+    console.error("Could not parse game from webhook response:", responseText.substring(0, 200));
+    throw new Error(`The game generator returned an unparsable format. Response snippet: ${responseText.substring(0, 150)}...`);
+  }
+  
+  if (!generatedGame.title || !Array.isArray(generatedGame.rules) || generatedGame.rules.length === 0) {
+    console.error("Parsed/constructed game is missing essential fields or has no rules:", generatedGame);
+    throw new Error("The game generator returned an incomplete game structure. Try adjusting your options or rephrasing the activity.");
+  }
+
+  if (params.includeDares) { 
+    if (!Array.isArray(generatedGame.dares)) {
+      console.warn("Dares were requested, but 'dares' field was not a valid array in the response. Defaulting to empty dares list.");
       generatedGame.dares = [];
     }
-    
-    return generatedGame;
-
-  } catch (error) {
-    console.error("Error generating game with Gemini:", error);
-    if (error.message.includes("JSON.parse")) {
-        throw new Error("The AI returned an invalid game format (not valid JSON). Please try again, or adjust your activity description as it might be confusing the AI.");
-    }
-    if (error.status && error.status >= 400 && error.status < 500) {
-      throw new Error(`AI service error: ${error.message}. Please check your input or API configuration.`);
-    }
-    if (error.status && error.status >= 500) {
-      throw new Error(`AI service is temporarily unavailable: ${error.message}. Please try again later.`);
-    }
-    throw new Error(error.message || "An unknown error occurred while generating the game with AI. Please try again.");
+  } else {
+    generatedGame.dares = [];
   }
+  
+  return generatedGame;
 };

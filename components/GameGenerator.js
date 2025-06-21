@@ -22,11 +22,13 @@ const GameGenerator = () => {
   const [generatedGame, setGeneratedGame] = React.useState(null); // Changed to React.useState
   const [isLoading, setIsLoading] = React.useState(false); // Changed to React.useState
   const [error, setError] = React.useState(null); // Changed to React.useState
+  const [randomPlaceholder, setRandomPlaceholder] = React.useState(''); // Changed to React.useState
 
+
+  // State for cocktail recipe request
   const [cocktailEmail, setCocktailEmail] = React.useState(''); // Changed to React.useState
   const [cocktailSubmissionStatus, setCocktailSubmissionStatus] = React.useState('idle'); // Changed to React.useState
   const [cocktailSubmissionError, setCocktailSubmissionError] = React.useState(null); // Changed to React.useState
-  const [randomPlaceholder, setRandomPlaceholder] = React.useState(''); // Changed to React.useState
 
   React.useEffect(() => { // Changed to React.useEffect
     // Set a random placeholder when the component mounts
@@ -37,6 +39,7 @@ const GameGenerator = () => {
       setRandomPlaceholder("e.g., At a funeral, In the gym..."); // Fallback if array is empty
     }
   }, []); // Empty dependency array means this runs once on mount
+
 
   const resetCocktailForm = React.useCallback(() => { // Changed to React.useCallback
     setCocktailEmail('');
@@ -66,11 +69,26 @@ const GameGenerator = () => {
     setGeneratedGame(null);
     resetCocktailForm();
     try {
-      const game = await generateGameWithGemini(options);
+      const chaosLevelIndex = CHAOS_LEVELS.indexOf(options.chaosLevel);
+      const chaosLevelNumeric = chaosLevelIndex !== -1 ? chaosLevelIndex + 1 : 1;
+      
+      console.log("GameGenerator Debug: Original ChaosLevel String:", options.chaosLevel);
+      console.log("GameGenerator Debug: Calculated Index:", chaosLevelIndex);
+      console.log("GameGenerator Debug: Calculated Numeric ChaosLevel:", chaosLevelNumeric);
+
+      const paramsForService = {
+        activity: options.activity,
+        chaosLevel: chaosLevelNumeric,
+        includeDares: options.includeDares,
+        numberOfRules: options.numberOfRules,
+      };
+      console.log("GameGenerator Debug: paramsForService (to be sent to service):", paramsForService); // Added log
+
+      const game = await generateGameWithGemini(paramsForService);
       setGeneratedGame(game);
     } catch (err) {
-      console.error("Error generating game with Gemini:", err);
-      setError(err.message || 'Failed to generate game with AI. Please try again.');
+      console.error("Error generating game:", err);
+      setError(err.message || 'Failed to generate game. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -142,7 +160,7 @@ const GameGenerator = () => {
           label: "What are you doing?",
           value: options.activity,
           onChange: (e) => handleInputChange('activity', e.target.value),
-          placeholder: randomPlaceholder || "e.g., At a funeral, In the gym...",
+          placeholder: randomPlaceholder || "e.g., At a funeral, In the gym, During a boring meeting",
           disabled: isLoading,
           onKeyDown: handleActivityKeyDown
         }),

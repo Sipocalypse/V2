@@ -1,96 +1,177 @@
 
-import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
-import { GameOptions, GeneratedGame } from '../types';
-import { API_MODEL_NAME } from '../constants';
+import { GeneratedGame } from '../types';
 
-const constructPrompt = (options: GameOptions): string => {
-  let prompt = `Generate a creative and fun drinking game titled based on the activity: "${options.activity}".\n`;
-  prompt += `The game should have exactly ${options.numberOfRules} rules.\n`;
-  prompt += `The chaos level should be: "${options.chaosLevel}". Examples for chaos levels are "Initial Sips", "Rising Revelry", "Pre-Apocalyptic Party", or "Sipocalypse Level Event".\n`;
-  
-  if (options.includeDares) {
-    prompt += `Include a section with 3-5 example dares relevant to the activity and chaos level.\n`;
-  } else {
-    prompt += `Do not include any dares.\n`;
-  }
+const GAME_GENERATOR_WEBHOOK_URL = 'https://hook.eu2.make.com/8ym052altan60ddmeki1zl2160f1ghxr';
 
-  prompt += `The output should be a JSON object with the following structure:
-{
-  "title": "Clear and Engaging Game Title",
-  "rules": ["Rule 1 text...", "Rule 2 text...", ...],
-  "dares": ["Dare 1 text...", "Dare 2 text...", ...]
+interface GameGenerationParams {
+  activity: string;
+  chaosLevel: number; // Expect number here
+  includeDares: boolean;
+  numberOfRules: number;
 }
-If dares are not requested, the "dares" array should be empty.
-The title should be catchy and related to the activity.
-The rules should be clear, concise, and easy to follow.
-The rules and dares should be directly related to the specified activity and chaos level.
-Ensure the number of rules matches exactly ${options.numberOfRules}.
-Do not wrap the JSON in markdown code fences.
-`;
-  return prompt;
-};
 
-export const generateGameWithGemini = async (options: GameOptions): Promise<GeneratedGame> => {
-  if (!process.env.API_KEY) {
-    console.error("API_KEY is not configured.");
-    throw new Error("Game generation service is not configured (API key missing). Please contact support.");
-  }
-  if (!options.activity || options.activity.trim() === "") {
+export const generateGameWithGemini = async (params: GameGenerationParams): Promise<GeneratedGame> => {
+  if (!params.activity || params.activity.trim() === "") {
     throw new Error("Activity must be provided to generate a game.");
   }
 
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const prompt = constructPrompt(options);
-
+  let response: Response;
   try {
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: API_MODEL_NAME,
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
+    console.log("Sending to webhook. Payload:", JSON.stringify(params));
+    response = await fetch(GAME_GENERATOR_WEBHOOK_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify(params),
     });
+  } catch (networkError: any) {
+    console.error("Network error calling webhook:", networkError);
+    throw new Error(`Failed to connect to the game generator: ${networkError.message}. Please check your internet connection.`);
+  }
 
-    let jsonStr = response.text.trim();
-    // Remove markdown fences if present, as requested in prompt.
-    // However, the official guidelines state the AI might still wrap it.
-    const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
-    const match = jsonStr.match(fenceRegex);
-    if (match && match[2]) {
-      jsonStr = match[2].trim();
-    }
-    
-    console.log("Raw JSON string from AI:", jsonStr);
-    
-    const generatedGame = JSON.parse(jsonStr) as GeneratedGame;
-
-    if (!generatedGame.title || !Array.isArray(generatedGame.rules) || generatedGame.rules.length === 0) {
-      console.error("Parsed JSON does not match expected GeneratedGame structure or is missing essential fields:", generatedGame);
-      throw new Error("The AI returned an unexpected game format. The game might not be related to your activity or is incomplete. Try adjusting your options or rephrasing the activity.");
-    }
-
-    if (options.includeDares) {
-      if (!Array.isArray(generatedGame.dares)) {
-        generatedGame.dares = []; 
+  if (!response.ok) {
+    let errorDetails = `Webhook request failed with status: ${response.status}`;
+    try {
+      const errorText = await response.text();
+      if (errorText) {
+        errorDetails += ` - ${errorText}`;
       }
+    } catch (e) {
+      // Ignore error from parsing response text if response is not ok
+    }
+    console.error(errorDetails);
+    throw new Error(errorDetails);
+  }
+
+  const responseText = await response.text();
+  let generatedGame: GeneratedGame | null = null;
+
+  // Attempt to parse as JSON first
+  try {
+    const parsedJson = JSON.parse(responseText);
+    if (parsedJson && typeof parsedJson.title === 'string' && Array.isArray(parsedJson.rules)) {
+      generatedGame = parsedJson as GeneratedGame;
     } else {
+        console.warn("Parsed JSON, but it does not match expected GeneratedGame structure:", parsedJson);
+    }
+  } catch (parseError: any) {
+    console.log("Failed to parse JSON response from webhook. Will attempt plain text parsing. Error:", parseError.message);
+    const trimmedResponseText = responseText.trim().toLowerCase();
+    if (trimmedResponseText === "accepted") {
+      console.error("Webhook returned 'Accepted' instead of game data.");
+      throw new Error("The game generator acknowledged the request but didn't return a game. Please check your Make.com scenario configuration or try again.");
+    }
+
+    // Advanced plain text parsing
+    const rawLines = responseText.split('\n');
+    const titleParts: string[] = [];
+    const ruleLines: string[] = [];
+    let foundFirstRule = false;
+
+    const rulePattern = /^\s*(\d+)\.\s*(.+)/; // Captures number and content
+    const inlineRulePattern = /(.*?)(\b\d+\.\s+.+)/; // For title ending and rule starting on same line
+
+    for (const rawLine of rawLines) {
+      const currentLine = rawLine.trim();
+      if (currentLine.length === 0) continue;
+
+      if (foundFirstRule) {
+        const match = currentLine.match(rulePattern);
+        if (match && match[2]) {
+          ruleLines.push(match[2].trim());
+        } else {
+          // Line in rules block not matching rule_pattern, could append to previous or log
+           console.warn("Non-rule line found within rules block (or malformed rule):", currentLine);
+        }
+      } else {
+        // We haven't found the first rule yet. This line could be title, or start rules.
+        const startsWithRuleMatch = currentLine.match(rulePattern);
+        if (startsWithRuleMatch && startsWithRuleMatch[2]) {
+          // This line STARTS with a rule
+          foundFirstRule = true;
+          ruleLines.push(startsWithRuleMatch[2].trim());
+        } else {
+          // This line does not START with a rule. Check for inline rule.
+          const inlineMatch = currentLine.match(inlineRulePattern);
+          if (inlineMatch && inlineMatch[1] !== undefined && inlineMatch[2]) {
+            // Line contains a title part and then a rule part
+            const titleCandidate = inlineMatch[1].trim();
+            const ruleFullText = inlineMatch[2].trim();
+
+            if (titleCandidate.length > 0) {
+              titleParts.push(titleCandidate);
+            }
+
+            // Re-check the extracted rule part with the standard rulePattern
+            const firstRuleContentMatch = ruleFullText.match(rulePattern);
+            if (firstRuleContentMatch && firstRuleContentMatch[2]) {
+              ruleLines.push(firstRuleContentMatch[2].trim());
+              foundFirstRule = true;
+            } else {
+              // Rule part was malformed, treat whole original line as title.
+              titleParts.push(currentLine);
+               console.warn("Malformed inline rule, treating as title:", currentLine);
+            }
+          } else {
+            // No inline rule, this whole line is a title part
+            titleParts.push(currentLine);
+          }
+        }
+      }
+    }
+
+    if (ruleLines.length > 0) {
+      let gameTitle: string;
+      const potentialTitle = titleParts.join(' ').trim();
+
+      if (potentialTitle.length > 0) {
+        gameTitle = potentialTitle;
+      } else {
+        console.warn("Webhook returned plain text rules without a clear title. Generating title based on activity.");
+        gameTitle = `Sipocalypse Game for '${params.activity}'`;
+        if (gameTitle.length > 70) { 
+          gameTitle = `Sipocalypse Game for '${params.activity.substring(0, 30)}...'`;
+        }
+        if (params.activity.trim() === "") {
+          gameTitle = "Generated Sipocalypse Game";
+        }
+      }
+      
+      generatedGame = {
+        title: gameTitle,
+        rules: ruleLines,
+        dares: [], 
+      };
+      console.log("Constructed game object from plain text:", generatedGame);
+      
+      if (params.includeDares) {
+        console.warn("Dares were requested, but the webhook returned a plain text list of rules. Dares section will be empty. For dares, the webhook should return structured JSON.");
+      }
+    } else if (titleParts.join('').trim().length > 0) {
+        // Only title was found, no rules.
+        console.warn(`Plain text response had a potential title "${titleParts.join(' ')}" but no parsable rules found. Discarding.`);
+    }
+  }
+
+  if (!generatedGame) {
+    console.error("Could not parse game from webhook response:", responseText.substring(0, 200)); // Log more of the response
+    throw new Error(`The game generator returned an unparsable format. Response snippet: ${responseText.substring(0, 150)}...`);
+  }
+
+  if (!generatedGame.title || !Array.isArray(generatedGame.rules) || generatedGame.rules.length === 0) {
+    console.error("Parsed/constructed game is missing essential fields or has no rules:", generatedGame);
+    throw new Error("The game generator returned an incomplete game structure. Try adjusting your options or rephrasing the activity.");
+  }
+
+  if (params.includeDares) {
+    if (!Array.isArray(generatedGame.dares)) {
+      console.warn("Dares were requested, but 'dares' field was not a valid array in the response. Defaulting to empty dares list.");
       generatedGame.dares = [];
     }
-    
-    return generatedGame;
-
-  } catch (error: any) {
-    console.error("Error generating game with Gemini:", error);
-    if (error.message.includes("JSON.parse")) {
-        throw new Error("The AI returned an invalid game format (not valid JSON). Please try again, or adjust your activity description as it might be confusing the AI.");
-    }
-    // Consider checking for specific Gemini API error types if available
-    if (error.status && error.status >= 400 && error.status < 500) {
-      throw new Error(`AI service error: ${error.message}. Please check your input or API configuration.`);
-    }
-    if (error.status && error.status >= 500) {
-      throw new Error(`AI service is temporarily unavailable: ${error.message}. Please try again later.`);
-    }
-    throw new Error(error.message || "An unknown error occurred while generating the game with AI. Please try again.");
+  } else {
+    generatedGame.dares = [];
   }
+  
+  return generatedGame;
 };

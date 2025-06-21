@@ -1,7 +1,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { GameOptions, GeneratedGame } from '../types';
-import { CHAOS_LEVELS, MIN_RULES, MAX_RULES, DEFAULT_RULES } from '../constants'; 
+import { CHAOS_LEVELS, MIN_RULES, MAX_RULES, DEFAULT_RULES, FUNNY_ACTIVITY_EXAMPLES } from '../constants'; 
 import { generateGameWithGemini } from '../services/geminiService';
 import GameDisplay from './GameDisplay';
 import Button from './Button';
@@ -22,11 +22,24 @@ const GameGenerator: React.FC = () => {
   const [generatedGame, setGeneratedGame] = useState<GeneratedGame | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [randomPlaceholder, setRandomPlaceholder] = useState<string>('');
+
 
   // State for cocktail recipe request
   const [cocktailEmail, setCocktailEmail] = useState<string>('');
   const [cocktailSubmissionStatus, setCocktailSubmissionStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [cocktailSubmissionError, setCocktailSubmissionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Set a random placeholder when the component mounts
+    if (FUNNY_ACTIVITY_EXAMPLES && FUNNY_ACTIVITY_EXAMPLES.length > 0) {
+      const randomIndex = Math.floor(Math.random() * FUNNY_ACTIVITY_EXAMPLES.length);
+      setRandomPlaceholder(FUNNY_ACTIVITY_EXAMPLES[randomIndex]);
+    } else {
+      setRandomPlaceholder("e.g., At a funeral, In the gym..."); // Fallback
+    }
+  }, []);
+
 
   const resetCocktailForm = useCallback(() => {
     setCocktailEmail('');
@@ -56,11 +69,26 @@ const GameGenerator: React.FC = () => {
     setGeneratedGame(null); // Clear previous game
     resetCocktailForm(); // Reset cocktail form for new game generation
     try {
-      const game = await generateGameWithGemini(options);
+      const chaosLevelIndex = CHAOS_LEVELS.indexOf(options.chaosLevel);
+      const chaosLevelNumeric = chaosLevelIndex !== -1 ? chaosLevelIndex + 1 : 1;
+
+      console.log("GameGenerator Debug: Original ChaosLevel String:", options.chaosLevel);
+      console.log("GameGenerator Debug: Calculated Index:", chaosLevelIndex);
+      console.log("GameGenerator Debug: Calculated Numeric ChaosLevel:", chaosLevelNumeric);
+
+      const paramsForService = {
+        activity: options.activity,
+        chaosLevel: chaosLevelNumeric,
+        includeDares: options.includeDares,
+        numberOfRules: options.numberOfRules,
+      };
+      console.log("GameGenerator Debug: paramsForService (to be sent to service):", paramsForService); // Added log
+
+      const game = await generateGameWithGemini(paramsForService);
       setGeneratedGame(game);
     } catch (err: any) {
-      console.error("Error generating game with Gemini:", err);
-      setError(err.message || 'Failed to generate game with AI. Please try again.');
+      console.error("Error generating game:", err);
+      setError(err.message || 'Failed to generate game. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -142,7 +170,7 @@ const GameGenerator: React.FC = () => {
           label="What are you doing?"
           value={options.activity}
           onChange={(e) => handleInputChange('activity', e.target.value)}
-          placeholder="e.g., At a funeral, In the gym, During a boring meeting"
+          placeholder={randomPlaceholder || "e.g., At a funeral, In the gym, During a boring meeting"}
           disabled={isLoading}
           onKeyDown={handleActivityKeyDown} // Added onKeyDown handler
         />
