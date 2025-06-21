@@ -55,122 +55,72 @@ export const generateGameWithGemini = async (params) => { // options renamed to 
     const parsedJson = JSON.parse(responseText);
     if (parsedJson && typeof parsedJson.title === 'string' && Array.isArray(parsedJson.rules)) {
       generatedGame = parsedJson;
+      console.log("Successfully parsed JSON response from webhook:", generatedGame);
     } else {
         console.warn("Parsed JSON, but it does not match expected GeneratedGame structure:", parsedJson);
     }
   } catch (parseError) {
-    console.log("Failed to parse JSON response from webhook. Will attempt plain text parsing. Error:", parseError.message);
+    console.log("Failed to parse JSON response from webhook. Attempting ()-wrapped plain text parsing. Error:", parseError.message);
     const trimmedResponseText = responseText.trim().toLowerCase();
     if (trimmedResponseText === "accepted") {
       console.error("Webhook returned 'Accepted' instead of game data.");
       throw new Error("The game generator acknowledged the request but didn't return a game. Please check your Make.com scenario configuration or try again.");
     }
-
-    // Advanced plain text parsing
+    
+    // New plain text parsing for ()-wrapped content
     const rawLines = responseText.split('\n');
-    const titleParts = [];
-    const ruleLines = [];
-    let foundFirstRule = false;
-
-    const rulePattern = /^\s*(\d+)\.\s*(.+)/; 
-    const inlineRulePattern = /(.*?)(\b\d+\.\s*.+)/; 
-
+    let extractedTitle = null;
+    const extractedRules = [];
 
     for (const rawLine of rawLines) {
       const currentLine = rawLine.trim();
-      if (currentLine.length === 0) continue;
-
-      if (foundFirstRule) {
-        const match = currentLine.match(rulePattern);
-        if (match && typeof match[2] === 'string') {
-          ruleLines.push(match[2].trim());
-        } else if (match) {
-            console.warn("Rule pattern matched within rules block, but capture group 2 is not a string:", currentLine, match);
-        } else {
-           console.warn("Non-rule line found within rules block (or malformed rule):", currentLine);
-        }
-      } else {
-        const startsWithRuleMatch = currentLine.match(rulePattern);
-        if (startsWithRuleMatch && typeof startsWithRuleMatch[2] === 'string') {
-          foundFirstRule = true;
-          ruleLines.push(startsWithRuleMatch[2].trim());
-        } else if (startsWithRuleMatch) {
-            console.warn("startsWithRuleMatch pattern matched, but capture group 2 is not a string:", currentLine, startsWithRuleMatch);
-            titleParts.push(currentLine); 
-        } else {
-          const inlineMatch = currentLine.match(inlineRulePattern);
-          if (inlineMatch && typeof inlineMatch[1] === 'string' && typeof inlineMatch[2] === 'string') {
-            const titleCandidate = inlineMatch[1].trim();
-            const ruleFullText = inlineMatch[2].trim();
-
-            if (titleCandidate.length > 0) {
-              titleParts.push(titleCandidate);
-            }
-
-            const firstRuleContentMatch = ruleFullText.match(rulePattern);
-            if (firstRuleContentMatch && typeof firstRuleContentMatch[2] === 'string') {
-              ruleLines.push(firstRuleContentMatch[2].trim());
-              foundFirstRule = true;
-            } else {
-              titleParts.push(currentLine); 
-              console.warn("Malformed inline rule content, treating original line as title:", currentLine);
-            }
-          } else if (inlineMatch) {
-              titleParts.push(currentLine);
-              console.warn("Inline pattern matched but capture groups are not as expected (e.g. not strings), treating as title:", currentLine, inlineMatch);
+      if (currentLine.startsWith('(') && currentLine.endsWith(')')) {
+        const content = currentLine.substring(1, currentLine.length - 1).trim();
+        if (content.length > 0) {
+          if (extractedTitle === null) {
+            extractedTitle = content;
           } else {
-            titleParts.push(currentLine);
+            extractedRules.push(content);
           }
         }
       }
     }
 
-    if (ruleLines.length > 0) {
-      let gameTitle;
-      let potentialTitle = titleParts.join(' ').trim();
+    if (extractedTitle && extractedRules.length > 0) {
+      let gameTitle = extractedTitle;
 
       // Heuristic: If potentialTitle is exactly the activity name repeated twice, reduce it.
       if (params.activity && params.activity.trim().length > 0) {
         const singleActivity = params.activity.trim();
         const doubleActivityPattern = new RegExp(`^${escapeRegExp(singleActivity)}\\s+${escapeRegExp(singleActivity)}$`, 'i');
-        if (doubleActivityPattern.test(potentialTitle)) {
-          console.warn(`Sanitizing title: Detected doubled activity name "${potentialTitle}". Reducing to "${singleActivity}".`);
-          potentialTitle = singleActivity;
-        }
-      }
-      
-
-      if (potentialTitle.length > 0) {
-        gameTitle = potentialTitle;
-      } else {
-        console.warn("Webhook returned plain text rules without a clear title. Generating title based on activity.");
-        gameTitle = `Sipocalypse Game for '${params.activity}'`;
-        if (gameTitle.length > 70) { 
-          gameTitle = `Sipocalypse Game for '${params.activity.substring(0, 30)}...'`;
-        }
-        if (params.activity.trim() === "") {
-          gameTitle = "Generated Sipocalypse Game";
+        if (doubleActivityPattern.test(gameTitle)) {
+          console.warn(`Sanitizing title: Detected doubled activity name "${gameTitle}". Reducing to "${singleActivity}".`);
+          gameTitle = singleActivity;
         }
       }
       
       generatedGame = {
         title: gameTitle,
-        rules: ruleLines,
-        dares: [], 
+        rules: extractedRules,
+        dares: [], // Dares are not parsed from this ()-wrapped format
       };
-      console.log("Constructed game object from plain text:", generatedGame);
+      console.log("Constructed game object from ()-wrapped plain text:", generatedGame);
       
       if (params.includeDares) {
-        console.warn("Dares were requested, but the webhook returned a plain text list of rules. Dares section will be empty. For dares, the webhook should return structured JSON.");
+        console.warn("Dares were requested, but the webhook returned ()-wrapped plain text. Dares section will be empty. For dares, the webhook should return structured JSON.");
       }
-    } else if (titleParts.join('').trim().length > 0) {
-        console.warn(`Plain text response had a potential title "${titleParts.join(' ')}" but no parsable rules found. Discarding.`);
+    } else if (extractedTitle && extractedRules.length === 0) {
+        console.warn(`Webhook returned a ()-wrapped title "${extractedTitle}" but no ()-wrapped rules in the expected format. Discarding.`);
+    } else if (!extractedTitle && extractedRules.length > 0) {
+        console.warn(`Webhook returned ()-wrapped rules but no ()-wrapped title in the expected format. Discarding.`);
+    } else {
+        console.warn("Webhook response was not valid JSON and did not contain ()-wrapped title and rules.");
     }
   }
 
   if (!generatedGame) {
     console.error("Could not parse game from webhook response:", responseText.substring(0, 200));
-    throw new Error(`The game generator returned an unparsable format. Response snippet: ${responseText.substring(0, 150)}...`);
+    throw new Error(`The game generator returned an unparsable format. Ensure the webhook returns valid JSON or ()-wrapped text. Response snippet: ${responseText.substring(0, 150)}...`);
   }
 
   if (!generatedGame.title || !Array.isArray(generatedGame.rules) || generatedGame.rules.length === 0) {
@@ -178,13 +128,13 @@ export const generateGameWithGemini = async (params) => { // options renamed to 
     throw new Error("The game generator returned an incomplete game structure. Try adjusting your options or rephrasing the activity.");
   }
 
+  // Ensure dares structure based on request, even if not parsed from ()-wrapped text
   if (params.includeDares) {
-    if (!Array.isArray(generatedGame.dares)) {
-      console.warn("Dares were requested, but 'dares' field was not a valid array in the response. Defaulting to empty dares list.");
-      generatedGame.dares = [];
+    if (!Array.isArray(generatedGame.dares)) { // Could be populated if JSON was successfully parsed
+        generatedGame.dares = [];
     }
   } else {
-    generatedGame.dares = []; // Ensure dares is an empty array if not included
+    generatedGame.dares = []; 
   }
   
   return generatedGame;
