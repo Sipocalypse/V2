@@ -38,6 +38,7 @@
       background: transparent url('https://i.imgur.com/zCLTodn.png') center center / contain no-repeat;
       cursor: pointer;
       border: none;
+      box-shadow: none !important; /* Added to remove default shadow */
       margin-top: -10px;
     }
 
@@ -46,9 +47,9 @@
       height: 32px;
       background: transparent url('https://i.imgur.com/zCLTodn.png') center center / contain no-repeat;
       cursor: pointer;
-      border: none; /* Resetting border for Firefox */
-      border-radius: 0; /* Ensures image dictates shape */
-      margin-top: -10px;
+      border: none; 
+      box-shadow: none !important; /* Added to remove default shadow */
+      border-radius: 0; 
     }
 
     .custom-slider-thumb:disabled::-webkit-slider-thumb {
@@ -56,6 +57,7 @@
       filter: grayscale(100%);
       opacity: 0.6;
       cursor: not-allowed;
+      box-shadow: none !important; /* Added to remove default shadow */
     }
 
     .custom-slider-thumb:disabled::-moz-range-thumb {
@@ -63,6 +65,7 @@
       filter: grayscale(100%);
       opacity: 0.6;
       cursor: not-allowed;
+      box-shadow: none !important; /* Added to remove default shadow */
     }
 
     /* Custom styles for rule and dare numbers */
