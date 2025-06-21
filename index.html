@@ -38,8 +38,10 @@
       background: transparent url('https://i.imgur.com/zCLTodn.png') center center / contain no-repeat;
       cursor: pointer;
       border: none;
-      box-shadow: none !important; /* Added to remove default shadow */
-      margin-top: -10px;
+      box-shadow: none !important;
+      outline: none; /* Added */
+      border-radius: 0; /* Added */
+      margin-top: -10px; 
     }
 
     .custom-slider-thumb::-moz-range-thumb {
@@ -48,8 +50,9 @@
       background: transparent url('https://i.imgur.com/zCLTodn.png') center center / contain no-repeat;
       cursor: pointer;
       border: none; 
-      box-shadow: none !important; /* Added to remove default shadow */
+      box-shadow: none !important; 
       border-radius: 0; 
+      outline: none; /* Added */
     }
 
     .custom-slider-thumb:disabled::-webkit-slider-thumb {
@@ -57,7 +60,9 @@
       filter: grayscale(100%);
       opacity: 0.6;
       cursor: not-allowed;
-      box-shadow: none !important; /* Added to remove default shadow */
+      box-shadow: none !important;
+      outline: none; /* Added */
+      border-radius: 0; /* Added */
     }
 
     .custom-slider-thumb:disabled::-moz-range-thumb {
@@ -65,7 +70,9 @@
       filter: grayscale(100%);
       opacity: 0.6;
       cursor: not-allowed;
-      box-shadow: none !important; /* Added to remove default shadow */
+      box-shadow: none !important;
+      border-radius: 0; /* Already present or ensured */
+      outline: none; /* Added */
     }
 
     /* Custom styles for rule and dare numbers */

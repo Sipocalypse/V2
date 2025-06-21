@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react'; // Keep React import
 import Header from './components/Header.js';
 import Footer from './components/Footer.js';
 import Hero from './components/Hero.js';
@@ -7,22 +7,22 @@ import GameGenerator from './components/GameGenerator.js';
 import PrivacyPolicyPage from './components/PrivacyPolicyPage.js';
 
 const App = () => {
-  const [route, setRoute] = useState(window.location.hash);
+  const [route, setRoute] = React.useState(window.location.hash); // Changed to React.useState
 
-  useEffect(() => {
+  React.useEffect(() => { // Changed to React.useEffect
     const handleHashChange = () => {
       setRoute(window.location.hash);
       window.scrollTo(0, 0); // Scroll to top on route change
     };
 
     // Set initial route based on hash
-    setRoute(window.location.hash);
+    setRoute(window.location.hash); // This is fine
 
     window.addEventListener('hashchange', handleHashChange);
     return () => {
       window.removeEventListener('hashchange', handleHashChange);
     };
-  }, []);
+  }, []); // Empty dependency array is fine
 
   let pageContent;
   let showHero = false;

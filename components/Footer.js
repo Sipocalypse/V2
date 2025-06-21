@@ -4,8 +4,8 @@ import { SOCIAL_LINKS, APP_TITLE_PART1, APP_TITLE_PART2 } from '../constants.js'
 
 const Footer = () => {
   return (
-    React.createElement("footer", { className: "bg-custom-peach border-t-2 border-custom-pink" },
-      React.createElement("div", { className: "container mx-auto px-4 py-8 text-center text-custom-purple" },
+    React.createElement("footer", { className: "relative z-20 bg-gray-900/80 backdrop-blur-md border-t-2 border-custom-pink" },
+      React.createElement("div", { className: "container mx-auto px-4 py-8 text-center text-gray-300" },
         React.createElement("div", { className: "flex justify-center space-x-6 mb-4" },
           SOCIAL_LINKS.map((link) => (
             React.createElement("a", {

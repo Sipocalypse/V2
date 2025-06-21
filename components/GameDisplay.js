@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback } from 'react';
+import React from 'react'; // Keep React import
 // import { GeneratedGame } from '../types.js'; // Types are erased
 import Button from './Button.js';
 
@@ -12,10 +12,10 @@ const ShareIcon = ({className}) => (
 );
 
 const GameDisplay = ({ game }) => {
-  const [copied, setCopied] = useState(false);
-  const [shared, setShared] = useState(false);
+  const [copied, setCopied] = React.useState(false); // Changed to React.useState
+  const [shared, setShared] = React.useState(false); // Changed to React.useState
 
-  const formatGameForShareOrCopy = useCallback(() => {
+  const formatGameForShareOrCopy = React.useCallback(() => { // Changed to React.useCallback
     let text = `🎲 Sipocalypse Game: ${game.title} 🎲\n\n`;
     text += "📜 Rules:\n";
     game.rules.forEach((rule, index) => {
@@ -29,9 +29,9 @@ const GameDisplay = ({ game }) => {
     }
     text += "\nPlay responsibly! Find more games at www.sipocalypse.fun";
     return text;
-  }, [game]);
+  }, [game]); // Dependency for useCallback
 
-  const handleCopy = useCallback(async () => {
+  const handleCopy = React.useCallback(async () => { // Changed to React.useCallback
     const gameText = formatGameForShareOrCopy();
     try {
       await navigator.clipboard.writeText(gameText);
@@ -42,9 +42,9 @@ const GameDisplay = ({ game }) => {
       console.error('Failed to copy text: ', err);
       alert('Failed to copy rules. Please try selecting and copying manually.');
     }
-  }, [formatGameForShareOrCopy]);
+  }, [formatGameForShareOrCopy]); // Dependency for useCallback
 
-  const handleShare = useCallback(async () => {
+  const handleShare = React.useCallback(async () => { // Changed to React.useCallback
     const gameText = formatGameForShareOrCopy();
     const shareData = {
       title: `Sipocalypse Game: ${game.title}`,
@@ -70,7 +70,7 @@ const GameDisplay = ({ game }) => {
       console.log('Web Share API not supported, falling back to copy.');
       await handleCopy();
     }
-  }, [game.title, formatGameForShareOrCopy, handleCopy]);
+  }, [game.title, formatGameForShareOrCopy, handleCopy]); // Dependencies for useCallback
 
   const getShareButtonText = () => {
     if (shared) return 'Shared!';

@@ -1,7 +1,7 @@
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React from 'react'; // Changed from: import React, { useState, useCallback, useEffect } from 'react';
 // import { GameOptions, GeneratedGame } from '../types.js'; // Types are erased
-import { CHAOS_LEVELS, MIN_RULES, MAX_RULES, DEFAULT_RULES } from '../constants.js'; 
+import { CHAOS_LEVELS, MIN_RULES, MAX_RULES, DEFAULT_RULES, FUNNY_ACTIVITY_EXAMPLES } from '../constants.js';
 import { generateGameWithGemini } from '../services/geminiService.js';
 import GameDisplay from './GameDisplay.js';
 import Button from './Button.js';
@@ -13,39 +13,50 @@ import SliderInput from './SliderInput.js';
 const COCKTAIL_WEBHOOK_URL = 'https://hook.eu2.make.com/1jjo6upxzff3gryjehqi15h969mrdhvx';
 
 const GameGenerator = () => {
-  const [options, setOptions] = useState({
+  const [options, setOptions] = React.useState({ // Changed to React.useState
     activity: '',
-    chaosLevel: CHAOS_LEVELS[0], 
+    chaosLevel: CHAOS_LEVELS[0],
     includeDares: false,
     numberOfRules: DEFAULT_RULES,
   });
-  const [generatedGame, setGeneratedGame] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [generatedGame, setGeneratedGame] = React.useState(null); // Changed to React.useState
+  const [isLoading, setIsLoading] = React.useState(false); // Changed to React.useState
+  const [error, setError] = React.useState(null); // Changed to React.useState
 
-  const [cocktailEmail, setCocktailEmail] = useState('');
-  const [cocktailSubmissionStatus, setCocktailSubmissionStatus] = useState('idle');
-  const [cocktailSubmissionError, setCocktailSubmissionError] = useState(null);
+  const [cocktailEmail, setCocktailEmail] = React.useState(''); // Changed to React.useState
+  const [cocktailSubmissionStatus, setCocktailSubmissionStatus] = React.useState('idle'); // Changed to React.useState
+  const [cocktailSubmissionError, setCocktailSubmissionError] = React.useState(null); // Changed to React.useState
+  const [randomPlaceholder, setRandomPlaceholder] = React.useState(''); // Changed to React.useState
 
-  const resetCocktailForm = useCallback(() => {
+  React.useEffect(() => { // Changed to React.useEffect
+    // Set a random placeholder when the component mounts
+    if (FUNNY_ACTIVITY_EXAMPLES && FUNNY_ACTIVITY_EXAMPLES.length > 0) {
+      const randomIndex = Math.floor(Math.random() * FUNNY_ACTIVITY_EXAMPLES.length);
+      setRandomPlaceholder(FUNNY_ACTIVITY_EXAMPLES[randomIndex]);
+    } else {
+      setRandomPlaceholder("e.g., At a funeral, In the gym..."); // Fallback if array is empty
+    }
+  }, []); // Empty dependency array means this runs once on mount
+
+  const resetCocktailForm = React.useCallback(() => { // Changed to React.useCallback
     setCocktailEmail('');
     setCocktailSubmissionStatus('idle');
     setCocktailSubmissionError(null);
-  }, []);
+  }, []); // Dependencies for useCallback
 
-  const handleInputChange = useCallback((field, value) => {
-    setOptions(prev => ({ 
-      ...prev, 
-      [field]: field === 'numberOfRules' ? Number(value) : value 
+  const handleInputChange = React.useCallback((field, value) => { // Changed to React.useCallback
+    setOptions(prev => ({
+      ...prev,
+      [field]: field === 'numberOfRules' ? Number(value) : value
     }));
     if (generatedGame) {
-        setGeneratedGame(null); 
+        setGeneratedGame(null);
         resetCocktailForm();
     }
     setError(null);
-  }, [generatedGame, resetCocktailForm]);
+  }, [generatedGame, resetCocktailForm]); // Dependencies for useCallback
 
-  const handleGenerateGame = useCallback(async () => {
+  const handleGenerateGame = React.useCallback(async () => { // Changed to React.useCallback
     if (!options.activity.trim()) {
       setError("Please tell us what you're doing!");
       return;
@@ -63,7 +74,7 @@ const GameGenerator = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [options, resetCocktailForm]);
+  }, [options, resetCocktailForm]); // Dependencies for useCallback
 
   const handleActivityKeyDown = (event) => {
     if (event.key === 'Enter' && options.activity.trim() && !isLoading) {
@@ -91,13 +102,13 @@ const GameGenerator = () => {
         } catch (e) { /* Ignore */ }
         throw new Error(errorDetails);
     }
-    console.log('Webhook response:', await response.text()); 
+    console.log('Webhook response:', await response.text());
   };
 
   const handleCocktailEmailChange = (e) => {
     setCocktailEmail(e.target.value);
     if (cocktailSubmissionStatus === 'error' || cocktailSubmissionStatus === 'success') {
-        setCocktailSubmissionStatus('idle'); 
+        setCocktailSubmissionStatus('idle');
         setCocktailSubmissionError(null);
     }
   };
@@ -131,17 +142,17 @@ const GameGenerator = () => {
           label: "What are you doing?",
           value: options.activity,
           onChange: (e) => handleInputChange('activity', e.target.value),
-          placeholder: "e.g., At a funeral, In the gym, During a boring meeting",
+          placeholder: randomPlaceholder || "e.g., At a funeral, In the gym...",
           disabled: isLoading,
           onKeyDown: handleActivityKeyDown
         }),
         React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-6" },
           React.createElement(SelectInput, {
-            id: "chaosLevel", 
-            label: "Chaos Level", 
-            value: options.chaosLevel, 
-            onChange: (e) => handleInputChange('chaosLevel', e.target.value), 
-            options: CHAOS_LEVELS, 
+            id: "chaosLevel",
+            label: "Chaos Level",
+            value: options.chaosLevel,
+            onChange: (e) => handleInputChange('chaosLevel', e.target.value),
+            options: CHAOS_LEVELS,
             disabled: isLoading
           }),
           React.createElement(SliderInput, {
@@ -155,7 +166,7 @@ const GameGenerator = () => {
             unitLabel: "rules"
           })
         ),
-        React.createElement("div", { className: "pt-2" }, 
+        React.createElement("div", { className: "pt-2" },
             React.createElement(CheckboxInput, {
             id: "includeDares",
             label: "Include Dares?",
@@ -170,7 +181,7 @@ const GameGenerator = () => {
         disabled: isLoading || !options.activity.trim(),
         isLoading: isLoading,
         variant: "primary",
-        size: "lg", 
+        size: "lg",
         className: "w-full text-lg py-3.5 font-semibold",
         title: !options.activity.trim() ? "Please enter what you're doing first" : undefined
       },
@@ -208,7 +219,7 @@ const GameGenerator = () => {
                 variant: "secondary",
                 className: "w-full text-md py-2.5 font-medium"
               },
-              cocktailSubmissionStatus === 'submitting' ? 'Sending Request...' : 
+              cocktailSubmissionStatus === 'submitting' ? 'Sending Request...' :
               cocktailSubmissionStatus === 'success' ? 'Request Sent!' : 'Get My Cocktail Recipe!'
               ),
               React.createElement("p", {className: "text-xs text-gray-400 mt-3 text-center"},
