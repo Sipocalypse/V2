@@ -4,17 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sipocalypse Fun</title>
-  <!-- Minimal process object shim -->
+  <!-- Global 'process' object shim - MUST BE THE VERY FIRST SCRIPT -->
   <script>
-    if (typeof window.process === 'undefined') {
-      window.process = { 
-        env: {}, 
-        browser: true, 
-        version: '', 
+    if (typeof process === 'undefined') {
+      var process = {
+        env: {},
+        browser: true,
+        version: '',
         versions: {},
-        nextTick: function(fn) { setTimeout(fn, 0); } // Added basic nextTick
+        nextTick: function(fn) { setTimeout(fn, 0); },
+        platform: 'browser' // Common property checked by some libraries
       };
-      console.log('Minimal "process" object shim (with nextTick) created.');
+      console.log('Global "process" object shim (var process, with platform) created.');
     }
   </script>
   <!-- Add your favicon link here, e.g., <link rel="icon" href="/favicon.ico" /> -->
