@@ -2,7 +2,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { GameOptions, GeneratedGame } from '../types';
 import { CHAOS_LEVELS, MIN_RULES, MAX_RULES, DEFAULT_RULES, FUNNY_ACTIVITY_EXAMPLES } from '../constants'; 
-import { generateGameWithGemini } from '../services/geminiService';
+import { generateGameViaWebhook } from '../services/gameService'; // Updated import path and function name
 import GameDisplay from './GameDisplay';
 import Button from './Button';
 import SelectInput from './SelectInput';
@@ -84,7 +84,7 @@ const GameGenerator: React.FC = () => {
       };
       console.log("GameGenerator Debug: paramsForService (to be sent to service):", paramsForService); // Added log
 
-      const game = await generateGameWithGemini(paramsForService);
+      const game = await generateGameViaWebhook(paramsForService); // Updated function call
       setGeneratedGame(game);
     } catch (err: any) {
       console.error("Error generating game:", err);
