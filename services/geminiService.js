@@ -70,23 +70,38 @@ export const generateGameWithGemini = async (params) => { // options renamed to 
     // New plain text parsing for ()-wrapped content
     const rawLines = responseText.split('\n');
     let extractedTitle = null;
-    const extractedRules = [];
+    const finalExtractedRules = [];
+    let firstParenLineProcessedAsTitle = false;
 
     for (const rawLine of rawLines) {
       const currentLine = rawLine.trim();
       if (currentLine.startsWith('(') && currentLine.endsWith(')')) {
         const content = currentLine.substring(1, currentLine.length - 1).trim();
         if (content.length > 0) {
-          if (extractedTitle === null) {
+          if (!firstParenLineProcessedAsTitle) {
             extractedTitle = content;
+            firstParenLineProcessedAsTitle = true;
           } else {
-            extractedRules.push(content);
+            // This is a subsequent ()-wrapped line (or lines).
+            // Its content might be one rule or multiple rules separated by newlines.
+            const potentialRulesInLine = content.split('\n');
+            for (const ruleText of potentialRulesInLine) {
+              const trimmedRuleText = ruleText.trim();
+              if (trimmedRuleText.length > 0) {
+                // Remove leading "X. " numbering if present
+                const ruleNumberPattern = /^\d+\.\s*/;
+                const cleanRule = trimmedRuleText.replace(ruleNumberPattern, '').trim();
+                if (cleanRule.length > 0) {
+                  finalExtractedRules.push(cleanRule);
+                }
+              }
+            }
           }
         }
       }
     }
 
-    if (extractedTitle && extractedRules.length > 0) {
+    if (extractedTitle && finalExtractedRules.length > 0) {
       let gameTitle = extractedTitle;
 
       // Heuristic: If potentialTitle is exactly the activity name repeated twice, reduce it.
@@ -101,7 +116,7 @@ export const generateGameWithGemini = async (params) => { // options renamed to 
       
       generatedGame = {
         title: gameTitle,
-        rules: extractedRules,
+        rules: finalExtractedRules,
         dares: [], // Dares are not parsed from this ()-wrapped format
       };
       console.log("Constructed game object from ()-wrapped plain text:", generatedGame);
@@ -109,12 +124,12 @@ export const generateGameWithGemini = async (params) => { // options renamed to 
       if (params.includeDares) {
         console.warn("Dares were requested, but the webhook returned ()-wrapped plain text. Dares section will be empty. For dares, the webhook should return structured JSON.");
       }
-    } else if (extractedTitle && extractedRules.length === 0) {
-        console.warn(`Webhook returned a ()-wrapped title "${extractedTitle}" but no ()-wrapped rules in the expected format. Discarding.`);
-    } else if (!extractedTitle && extractedRules.length > 0) {
+    } else if (extractedTitle && finalExtractedRules.length === 0) {
+        console.warn(`Webhook returned a ()-wrapped title "${extractedTitle}" but no ()-wrapped rules in the expected format or rule content was empty after processing. Discarding.`);
+    } else if (!extractedTitle && finalExtractedRules.length > 0) {
         console.warn(`Webhook returned ()-wrapped rules but no ()-wrapped title in the expected format. Discarding.`);
     } else {
-        console.warn("Webhook response was not valid JSON and did not contain ()-wrapped title and rules.");
+        console.warn("Webhook response was not valid JSON and did not contain ()-wrapped title and rules in the expected format.");
     }
   }
 

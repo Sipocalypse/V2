@@ -62,67 +62,99 @@ export const generateGameViaWebhook = async (params: GameGenerationParams): Prom
         console.warn("Parsed JSON, but it does not match expected GeneratedGame structure:", parsedJson);
     }
   } catch (parseError: any) {
-    console.log("Failed to parse JSON response from webhook. Attempting ()-wrapped plain text parsing. Error:", parseError.message);
+    console.log("Failed to parse JSON response from webhook. Attempting general plain text parsing. Error:", parseError.message);
     const trimmedResponseText = responseText.trim().toLowerCase();
     if (trimmedResponseText === "accepted") {
       console.error("Webhook returned 'Accepted' instead of game data.");
       throw new Error("The game generator acknowledged the request but didn't return a game. Please check your Make.com scenario configuration or try again.");
     }
 
-    // New plain text parsing for ()-wrapped content
-    const rawLines = responseText.split('\n');
-    let extractedTitle: string | null = null;
+    // General plain text parsing logic
+    const lines = responseText.split('\n');
+    const titleParts: string[] = [];
     const extractedRules: string[] = [];
+    let rulesStarted = false;
+    
+    // Regex for lines starting with a rule number (e.g., "1. ", "01. ", "  2. ")
+    const startsWithRulePattern = /^\s*(\d+)\.\s*(.*)/;
+    // Regex for rule number appearing later in the line (e.g., "Title part 1. Rule part")
+    const inlineRulePattern = /^(.*?)\s*(\d+)\.\s*(.*)/s; // s flag for dotall, though less critical here
 
-    for (const rawLine of rawLines) {
+    for (const rawLine of lines) {
       const currentLine = rawLine.trim();
-      if (currentLine.startsWith('(') && currentLine.endsWith(')')) {
-        const content = currentLine.substring(1, currentLine.length - 1).trim();
-        if (content.length > 0) {
-          if (extractedTitle === null) {
-            extractedTitle = content;
-          } else {
-            extractedRules.push(content);
-          }
-        }
+      if (currentLine === "") continue;
+
+      if (rulesStarted) {
+        // If rules have started, assume subsequent non-empty lines are rules
+        // (after stripping potential numbering if it's there)
+        const match = currentLine.match(startsWithRulePattern);
+        const ruleContent = match && typeof match[2] === 'string' ? match[2].trim() : currentLine;
+        if (ruleContent) extractedRules.push(ruleContent);
+        continue;
+      }
+
+      // Check if the current line starts with a rule number
+      const startsWithRuleMatch = currentLine.match(startsWithRulePattern);
+      if (startsWithRuleMatch) {
+        rulesStarted = true;
+        const ruleContent = typeof startsWithRuleMatch[2] === 'string' ? startsWithRuleMatch[2].trim() : '';
+        if (ruleContent) extractedRules.push(ruleContent);
+        continue;
+      }
+
+      // Check if the current line contains a rule number (inline rule)
+      const inlineMatch = currentLine.match(inlineRulePattern);
+      if (inlineMatch) {
+        rulesStarted = true;
+        const titlePart = typeof inlineMatch[1] === 'string' ? inlineMatch[1].trim() : '';
+        const ruleContent = typeof inlineMatch[3] === 'string' ? inlineMatch[3].trim() : '';
+
+        if (titlePart) titleParts.push(titlePart);
+        if (ruleContent) extractedRules.push(ruleContent);
+        continue;
+      }
+
+      // If none of the above, and rules haven't started, it's a title part
+      if (!rulesStarted) {
+        titleParts.push(currentLine);
       }
     }
 
-    if (extractedTitle && extractedRules.length > 0) {
-      let gameTitle = extractedTitle;
+    let gameTitle = titleParts.join(' ').trim();
 
-      // Heuristic: If potentialTitle is exactly the activity name repeated twice, reduce it.
-      if (params.activity && params.activity.trim().length > 0) {
-        const singleActivity = params.activity.trim();
-        const doubleActivityPattern = new RegExp(`^${escapeRegExp(singleActivity)}\\s+${escapeRegExp(singleActivity)}$`, 'i');
-        if (doubleActivityPattern.test(gameTitle)) {
-          console.warn(`Sanitizing title: Detected doubled activity name "${gameTitle}". Reducing to "${singleActivity}".`);
-          gameTitle = singleActivity;
-        }
+    if (!gameTitle && extractedRules.length > 0) {
+      // If no title was found but rules exist, generate a default title
+      console.warn("No clear title found in plain text, but rules were extracted. Generating default title.");
+      gameTitle = `Sipocalypse Game for '${params.activity}'`;
+    } else if (gameTitle && params.activity && params.activity.trim().length > 0) {
+      // Heuristic: If gameTitle is exactly the activity name repeated twice, reduce it.
+      const singleActivity = params.activity.trim();
+      const doubleActivityPattern = new RegExp(`^${escapeRegExp(singleActivity)}\\s+${escapeRegExp(singleActivity)}$`, 'i');
+      if (doubleActivityPattern.test(gameTitle)) {
+        console.warn(`Sanitizing title: Detected doubled activity name "${gameTitle}". Reducing to "${singleActivity}".`);
+        gameTitle = singleActivity;
       }
-      
+    }
+    
+    if (gameTitle && extractedRules.length > 0) {
       generatedGame = {
         title: gameTitle,
         rules: extractedRules,
-        dares: [], // Dares are not parsed from this ()-wrapped format
+        dares: [], // Dares are not parsed from this plain text format
       };
-      console.log("Constructed game object from ()-wrapped plain text:", generatedGame);
+      console.log("Constructed game object from general plain text:", generatedGame);
       
       if (params.includeDares) {
-        console.warn("Dares were requested, but the webhook returned ()-wrapped plain text. Dares section will be empty. For dares, the webhook should return structured JSON.");
+        console.warn("Dares were requested, but the webhook returned plain text. Dares section will be empty. For dares, webhook should return structured JSON.");
       }
-    } else if (extractedTitle && extractedRules.length === 0) {
-        console.warn(`Webhook returned a ()-wrapped title "${extractedTitle}" but no ()-wrapped rules in the expected format. Discarding.`);
-    } else if (!extractedTitle && extractedRules.length > 0) {
-        console.warn(`Webhook returned ()-wrapped rules but no ()-wrapped title in the expected format. Discarding.`);
     } else {
-        console.warn("Webhook response was not valid JSON and did not contain ()-wrapped title and rules.");
+        console.warn("Webhook response was not valid JSON and did not yield a title and rules from plain text parsing.");
     }
   }
 
   if (!generatedGame) {
     console.error("Could not parse game from webhook response:", responseText.substring(0, 200));
-    throw new Error(`The game generator returned an unparsable format. Ensure the webhook returns valid JSON or ()-wrapped text. Response snippet: ${responseText.substring(0, 150)}...`);
+    throw new Error(`The game generator returned an unparsable format. Ensure webhook returns valid JSON or plain text with title and numbered rules. Response snippet: ${responseText.substring(0, 150)}...`);
   }
 
   if (!generatedGame.title || !Array.isArray(generatedGame.rules) || generatedGame.rules.length === 0) {
@@ -130,9 +162,9 @@ export const generateGameViaWebhook = async (params: GameGenerationParams): Prom
     throw new Error("The game generator returned an incomplete game structure. Try adjusting your options or rephrasing the activity.");
   }
 
-  // Ensure dares structure based on request, even if not parsed from ()-wrapped text
+  // Ensure dares structure based on request
   if (params.includeDares) {
-    if (!Array.isArray(generatedGame.dares)) { // Could be populated if JSON was successfully parsed
+    if (!Array.isArray(generatedGame.dares)) {
       generatedGame.dares = [];
     }
   } else {
