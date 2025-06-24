@@ -1,4 +1,3 @@
-
 import React from 'react';
 import Button from './Button.js';
 
@@ -15,7 +14,7 @@ const Hero = () => {
           alt: "Sipocalypse Logo",
           className: "max-w-lg w-full h-auto mb-8 md:mb-10 mx-auto"
         }),
-        React.createElement("p", { className: "text-lg md:text-xl text-white max-w-2xl mx-auto mb-10" },
+        React.createElement("p", { className: "font-luckiest text-custom-purple text-3xl md:text-4xl max-w-3xl mx-auto mb-10" },
           "Every activity is now a drinking game. You’re welcome."
         ),
         React.createElement(Button, {

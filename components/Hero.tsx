@@ -16,7 +16,7 @@ const Hero: React.FC = () => {
           alt="Sipocalypse Logo"
           className="max-w-lg w-full h-auto mb-8 md:mb-10 mx-auto"
         />
-        <p className="text-lg md:text-xl text-white max-w-2xl mx-auto mb-10">
+        <p className="font-luckiest text-custom-purple text-3xl md:text-4xl max-w-3xl mx-auto mb-10">
           Every activity is now a drinking game. You’re welcome.
         </p>
         <Button

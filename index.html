@@ -20,10 +20,44 @@
   </script>
   <!-- Add your favicon link here, e.g., <link rel="icon" href="/favicon.ico" /> -->
   <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- FONT LOADING SECTION -->
+  <!-- Current fonts loaded: Luckiest Guy & Poppins -->
   <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <!--
+    IMPORTANT: TO USE THE 'Elizeth' FONT (or any other custom font), YOU MUST LOAD IT.
+    Tailwind is configured below to use 'Elizeth', but the font files themselves are not loaded by this default setup.
+    Here are two common ways to load fonts:
+
+    1. IF 'Elizeth' IS ON GOOGLE FONTS (e.g., 'Elizeth Extrabold 800'):
+       Search for it on fonts.google.com. If found, Google Fonts will provide a <link> tag.
+       You would then ADD or MERGE that link here. For example, if 'Elizeth' Extrabold (800 weight) is available,
+       your combined link might look like:
+       <link href="https://fonts.googleapis.com/css2?family=Elizeth:wght@800&family=Luckiest+Guy&family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+       (Ensure the font name 'Elizeth' in the CSS/Tailwind config matches the name provided by Google Fonts exactly).
+
+    2. IF YOU HAVE THE FONT FILES (e.g., elizeth-extrabold.woff2):
+       a. Place the font files in a publicly accessible folder in your project (e.g., create an 'assets/fonts/' directory).
+       b. Then, define the font using @font-face rules within the <style> tags below (or in a separate CSS file linked here).
+          Example (adjust paths and font details as needed):
+          ----------------------------------------------------
+          <style>
+            @font-face {
+              font-family: 'Elizeth'; /* This name must match the key in tailwind.config.fontFamily */
+              src: url('/assets/fonts/elizeth-extrabold.woff2') format('woff2'),
+                   url('/assets/fonts/elizeth-extrabold.woff') format('woff');
+              font-weight: 800; /* Corresponds to 'extrabold' */
+              font-style: normal; /* Or 'italic' if it's an italic variant */
+            }
+            /* ... other styles ... */
+          </style>
+          ----------------------------------------------------
+  -->
+  
   <style>
     body {
-      font-family: 'Poppins', sans-serif;
+      font-family: 'Poppins', sans-serif; /* Default fallback font */
     }
     .font-luckiest {
       font-family: 'Luckiest Guy', cursive;
@@ -121,7 +155,12 @@
           fontFamily: {
             sans: ['Poppins', 'sans-serif'],
             luckiest: ['Luckiest Guy', 'cursive'],
-            comic: ['Segoe UI', 'Tahoma', 'Geneva', 'Verdana', 'sans-serif'], // Corrected font definition
+            comic: ['Segoe UI', 'Tahoma', 'Geneva', 'Verdana', 'sans-serif'],
+            jubilat: ['Jubilat', 'Poppins', 'sans-serif'], // Keep fallbacks
+            viroqua: ['Viroqua', 'Jubilat', 'Poppins', 'sans-serif'], // Keep fallbacks
+            lexia: ['Lexia', 'Viroqua', 'Jubilat', 'Poppins', 'sans-serif'], // Keep fallbacks
+            // 'Elizeth' is defined here. For it to work, the font files must be loaded (see comments above).
+            elizeth: ['Elizeth', 'Lexia', 'Viroqua', 'Jubilat', 'Poppins', 'sans-serif'], 
           },
         }
       }
