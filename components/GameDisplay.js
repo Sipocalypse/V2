@@ -80,7 +80,7 @@ const GameDisplay = ({ game }) => {
   };
 
   return (
-    React.createElement("div", { className: "p-6 bg-gray-700/80 rounded-lg shadow-lg border border-gray-600/80" },
+    React.createElement("div", { className: "p-6 bg-gray-700/80 rounded-lg shadow-lg border border-custom-pink" }, // Updated border color
       React.createElement("h3", { className: "text-3xl font-luckiest text-center mb-6 text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-orange-400" },
         game.title
       ),

@@ -10,7 +10,7 @@ import CheckboxInput from './CheckboxInput.js';
 import TextInput from './TextInput.js';
 import SliderInput from './SliderInput.js';
 
-const COCKTAIL_WEBHOOK_URL = 'https://hook.eu2.make.com/1jjo6upxzff3gryjehqi15h969mrdhvx';
+const COCKTAIL_WEBHOOK_URL = 'https://hook.eu2.make.com/tre1fp9e0ayyugq3x18phpky3k51eonm';
 
 const GameGenerator = () => {
   const [options, setOptions] = React.useState({ // Changed to React.useState
