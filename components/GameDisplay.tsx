@@ -26,6 +26,7 @@ const GameDisplay: React.FC<GameDisplayProps> = ({ game }) => {
     game.rules.forEach((rule, index) => {
       text += `${index + 1}. ${rule}\n`;
     });
+    // Dares are only added to the copied/shared text if they exist and are populated
     if (game.dares && game.dares.length > 0) {
       text += "\n🔥 Dares:\n";
       game.dares.forEach((dare, index) => {
@@ -87,7 +88,7 @@ const GameDisplay: React.FC<GameDisplayProps> = ({ game }) => {
   };
 
   return (
-    <div className="p-6 bg-gray-700/80 rounded-lg shadow-lg border-4 border-custom-pink"> {/* Changed border-red-500 back to border-custom-pink */}
+    <div className="p-6 bg-gray-700/80 rounded-lg shadow-lg border-4 border-custom-pink">
       <h3 className="text-3xl font-luckiest text-center mb-6 text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-orange-400">
         {game.title}
       </h3>
@@ -101,6 +102,13 @@ const GameDisplay: React.FC<GameDisplayProps> = ({ game }) => {
         </ol>
       </div>
 
+      {/* 
+        Conditional rendering for the Dares section.
+        This section (including the "Dares:" heading and the list) will only be displayed 
+        if `game.dares` is an array and has one or more items. 
+        The `gameService` ensures `game.dares` is an empty array if the 'Include Dares' 
+        checkbox was unchecked by the user.
+      */}
       {game.dares && game.dares.length > 0 && (
         <div className="mb-8">
           <h4 className="text-xl font-semibold mb-3 text-pink-300">Dares:</h4>

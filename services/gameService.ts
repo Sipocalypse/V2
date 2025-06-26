@@ -56,25 +56,30 @@ export const generateGameViaWebhook = async (params: GameGenerationParams): Prom
   try {
     const parsedJson = JSON.parse(responseText);
     if (parsedJson && typeof parsedJson.title === 'string' && Array.isArray(parsedJson.rules)) {
-      generatedGame = { // Initialize with potentially all rules and existing dares
-        title: parsedJson.title,
-        rules: parsedJson.rules,
-        dares: Array.isArray(parsedJson.dares) ? parsedJson.dares : []
-      };
-      console.log("Successfully parsed JSON response from webhook. Initial rules count:", generatedGame.rules.length, "Initial dares count:", generatedGame.dares.length);
+      const allPotentialRulesFromSource = parsedJson.rules;
+      const daresDirectlyFromSource = Array.isArray(parsedJson.dares) ? parsedJson.dares : [];
 
-      // If dares are included and rules array is longer than expected, separate them
-      if (params.includeDares && generatedGame.rules.length > params.numberOfRules) {
-        console.warn(`JSON response had ${generatedGame.rules.length} items in 'rules' array, but expected only ${params.numberOfRules} rules. Assuming extra items are dares.`);
-        const actualRules = generatedGame.rules.slice(0, params.numberOfRules);
-        const potentialDaresFromRules = generatedGame.rules.slice(params.numberOfRules);
-        
-        generatedGame.rules = actualRules;
-        generatedGame.dares = generatedGame.dares.concat(potentialDaresFromRules); // Add to existing dares
-        console.log(`Separated rules and dares from JSON. Now ${generatedGame.rules.length} rules and ${generatedGame.dares.length} dares.`);
+      generatedGame = {
+        title: parsedJson.title,
+        rules: [], // Initialize and populate next
+        dares: []  // Initialize and populate next
+      };
+
+      if (params.includeDares) {
+        generatedGame.rules = allPotentialRulesFromSource.slice(0, params.numberOfRules);
+        const daresFromRulesOverflow = allPotentialRulesFromSource.length > params.numberOfRules 
+                                        ? allPotentialRulesFromSource.slice(params.numberOfRules) 
+                                        : [];
+        generatedGame.dares = daresDirectlyFromSource.concat(daresFromRulesOverflow);
+        console.log(`JSON PARSING (Dares INCLUDED): Rules capped/taken: ${generatedGame.rules.length}. Dares from 'dares' field: ${daresDirectlyFromSource.length}. Dares from 'rules' overflow: ${daresFromRulesOverflow.length}. Total dares: ${generatedGame.dares.length}`);
+      } else {
+        // Dares NOT included
+        generatedGame.rules = allPotentialRulesFromSource.slice(0, params.numberOfRules); // Cap rules
+        generatedGame.dares = []; // Explicitly no dares
+        console.log(`JSON PARSING (Dares NOT INCLUDED): Rules capped to: ${generatedGame.rules.length}. Dares explicitly set to empty.`);
       }
     } else {
-        console.warn("Parsed JSON, but it does not match expected GeneratedGame structure:", parsedJson);
+        console.warn("Parsed JSON, but it does not match expected GeneratedGame structure (missing title or rules array):", parsedJson);
     }
   } catch (parseError: any) {
     console.log("Failed to parse JSON response from webhook. Attempting general plain text parsing. Error:", parseError.message);
@@ -87,10 +92,10 @@ export const generateGameViaWebhook = async (params: GameGenerationParams): Prom
     // General plain text parsing logic
     const lines = responseText.split('\n');
     const titleParts: string[] = [];
-    const extractedItems: string[] = []; // Will hold all rule-like/dare-like items
-    let itemsStarted = false; // Renamed from rulesStarted for clarity
+    const extractedItems: string[] = []; 
+    let itemsStarted = false; 
     
-    const startsWithItemPattern = /^\s*(\d+)\.\s*(.*)/; // General item pattern
+    const startsWithItemPattern = /^\s*(\d+)\.\s*(.*)/; 
     const inlineItemPattern = /^(.*?)\s*(\d+)\.\s*(.*)/s; 
 
     for (const rawLine of lines) {
@@ -143,26 +148,23 @@ export const generateGameViaWebhook = async (params: GameGenerationParams): Prom
     }
     
     if (gameTitle && extractedItems.length > 0) {
-      const actualRulesFromText = params.includeDares && extractedItems.length > params.numberOfRules 
-                                   ? extractedItems.slice(0, params.numberOfRules)
-                                   : extractedItems;
-      const daresFromText = params.includeDares && extractedItems.length > params.numberOfRules
-                             ? extractedItems.slice(params.numberOfRules)
-                             : [];
+      let actualRulesFromText;
+      let daresFromText = [];
+
+      actualRulesFromText = extractedItems.slice(0, params.numberOfRules); // Always cap rules
+
+      if (params.includeDares && extractedItems.length > params.numberOfRules) {
+        daresFromText = extractedItems.slice(params.numberOfRules);
+        console.log(`PLAIN TEXT (Dares INCLUDED): Rules: ${actualRulesFromText.length}. Dares from overflow: ${daresFromText.length}`);
+      } else {
+         console.log(`PLAIN TEXT (Dares NOT INCLUDED or no overflow): Rules: ${actualRulesFromText.length}. Dares explicitly set to empty.`);
+      }
       
       generatedGame = {
         title: gameTitle,
         rules: actualRulesFromText,
         dares: daresFromText,
       };
-      console.log("Constructed game object from plain text. Rules:", actualRulesFromText.length, "Dares:", daresFromText.length);
-
-      if (params.includeDares && daresFromText.length === 0 && extractedItems.length <= params.numberOfRules && extractedItems.length > 0) {
-          console.warn("Dares were requested, but plain text parsing did not yield enough items to separate dares from rules based on numberOfRules. All items treated as rules.");
-      } else if (params.includeDares && daresFromText.length > 0) {
-          console.log(`Successfully separated ${daresFromText.length} dares from plain text based on numberOfRules.`);
-      }
-
     } else {
         console.warn("Webhook response was not valid JSON and did not yield a title and items from plain text parsing.");
     }
@@ -178,23 +180,24 @@ export const generateGameViaWebhook = async (params: GameGenerationParams): Prom
     throw new Error("The game generator returned an incomplete game structure. Try adjusting your options or rephrasing the activity.");
   }
   
-  // Final Dares Sanitization
-  if (params.includeDares) {
-    if (generatedGame.dares && Array.isArray(generatedGame.dares)) {
-      if (generatedGame.dares.length > 0) {
-        console.log(`Dares requested and confirmed: ${generatedGame.dares.length} dare(s) are present.`);
-      } else {
-        console.log("Dares requested, but the 'dares' array is empty after all processing.");
-      }
-    } else {
-      console.warn("Dares requested, but no 'dares' array was populated or it's not an array. Dares list will be empty.");
-      generatedGame.dares = []; // Ensure it's an empty array.
-    }
-  } else { // Dares not requested
+  // Final Dares Sanitization & Normalization
+  // This ensures that if dares were not requested, the dares array is definitely empty.
+  // It also ensures that if dares *were* requested, the 'dares' property is an array (even if empty).
+  if (!params.includeDares) {
     if (generatedGame.dares && generatedGame.dares.length > 0) {
-      console.log("Dares NOT requested by the user. Clearing any dares found/parsed: ", generatedGame.dares.length, "dares removed.");
+      console.warn("FINAL SANITIZATION: Dares were NOT requested by user, but dares array was populated. Clearing it. This might indicate an earlier logic flaw if not expected.");
     }
-    generatedGame.dares = []; // Explicitly clear if not requested
+    generatedGame.dares = []; 
+  } else { // Dares were requested
+    if (!Array.isArray(generatedGame.dares)) {
+       console.warn("FINAL SANITIZATION: Dares were requested, but 'dares' property was not an array. Initializing as empty array.");
+       generatedGame.dares = [];
+    }
+    if (generatedGame.dares.length > 0) {
+      console.log(`FINAL SANITIZATION: Dares requested and confirmed: ${generatedGame.dares.length} dare(s) are present.`);
+    } else {
+      console.log("FINAL SANITIZATION: Dares requested, but the 'dares' array is empty after all processing.");
+    }
   }
   
   return generatedGame;
