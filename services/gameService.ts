@@ -4,11 +4,6 @@ import { GeneratedGame } from '../types';
 const GAME_GENERATOR_WEBHOOK_URL = 'https://hook.eu2.make.com/8ym052altan60ddmeki1zl2160f1ghxr';
 const DARE_SEPARATOR_KEYWORD = "###";
 
-// Helper to escape special characters for regex
-function escapeRegExp(string: string): string {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 // Cleans rule/dare lines: removes leading numbering (e.g., "1. "), trims, and filters empty.
 const cleanAndDeduplicatePotentialRules = (lines: string[]): string[] => {
   if (!Array.isArray(lines)) return [];
@@ -54,9 +49,10 @@ export const generateGameViaWebhook = async (params: GameGenerationParams): Prom
     let finalRules: string[];
     let finalDares: string[] = [];
 
+    // --- Start of Simplified Parsing Logic ---
     try {
+      // IDEAL JSON PATH: Try to parse as the perfect JSON object first.
       const parsedJson = JSON.parse(responseText);
-      // IDEAL JSON PATH: Only works if the JSON is a perfectly formed object.
       if (parsedJson && typeof parsedJson.title === 'string' && Array.isArray(parsedJson.rules)) {
         console.log("PARSING: Success with ideal JSON structure.");
         finalTitle = parsedJson.title;
@@ -65,30 +61,27 @@ export const generateGameViaWebhook = async (params: GameGenerationParams): Prom
           finalDares = cleanAndDeduplicatePotentialRules(parsedJson.dares);
         }
       } else {
-        // Force fallback for JSON that isn't the ideal object structure.
-        throw new Error("JSON is not in the ideal format. Falling back to text parsing.");
+        // Force fallback if JSON isn't the ideal object.
+        throw new Error("JSON not ideal, using fallback parser.");
       }
     } catch (e) {
-      // UNIFIED FALLBACK PATH for any plain text or non-ideal JSON.
+      // UNIFIED FALLBACK PATH: For any plain text or non-ideal JSON.
       console.log("PARSING: Using unified fallback for plain text or non-ideal JSON.");
 
       if (typeof responseText !== 'string' || !responseText.trim()) {
         throw new Error("Game generator returned an empty or invalid response.");
       }
-      if (responseText.trim().toLowerCase() === "accepted") {
-        throw new Error("The game generator acknowledged the request but didn't return a game. Check Make.com.");
-      }
-
+      
       const parts = responseText.split(DARE_SEPARATOR_KEYWORD);
       console.log(`PARSING (Fallback): Split response into ${parts.length} parts.`);
 
-      finalTitle = parts[0] ? parts[0].trim() : '';
-      const rulesPart = parts[1] || '';
-      finalRules = cleanAndDeduplicatePotentialRules(rulesPart.split('\n'));
-      
-      const daresPart = parts[2] || '';
-      finalDares = cleanAndDeduplicatePotentialRules(daresPart.split('\n'));
+      // This is the hardened logic to prevent "split on undefined" errors.
+      finalTitle = (parts[0] ?? '').trim();
+      finalRules = cleanAndDeduplicatePotentialRules((parts[1] ?? '').split('\n'));
+      finalDares = cleanAndDeduplicatePotentialRules((parts[2] ?? '').split('\n'));
     }
+    // --- End of Simplified Parsing Logic ---
+
 
     // --- Final Assembly ---
     if (!finalTitle) {
@@ -122,6 +115,7 @@ export const generateGameViaWebhook = async (params: GameGenerationParams): Prom
 
   } catch (error: any) {
     console.error("SERVICE CRITICAL ERROR:", error);
+    // Ensure we always throw a standard Error object
     throw new Error(error.message || "An unknown error occurred in the game service.");
   }
 };
