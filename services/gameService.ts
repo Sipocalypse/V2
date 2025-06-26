@@ -15,181 +15,275 @@ function escapeRegExp(string: string): string {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
 }
 
-const DARE_SEPARATOR_KEYWORD = "dares"; // Case-insensitive check will be used
+const DARE_SEPARATOR_KEYWORD = "###";
+
+// Cleans an array of potential strings: trims, filters out non-strings and empty strings.
+const cleanStringArrayBasic = (arr: any[]): string[] => {
+  if (!Array.isArray(arr)) return [];
+  return arr
+    .filter((item: any) => typeof item === 'string')
+    .map((s: string) => s.trim())
+    .filter((s: string) => s !== '');
+};
+
+// Cleans rule/dare lines: removes leading numbering (e.g., "1. "), trims, and filters empty.
+const cleanAndDeduplicatePotentialRules = (lines: string[]): string[] => {
+  if (!Array.isArray(lines)) return [];
+  return lines.map(line => line.replace(/^\s*\d+\.\s*/, '').trim()).filter(rule => rule !== "");
+};
+
+// Helper function to parse items using two separators (primarily for JSON arrays where "###" is an item)
+function parseItemsWithTwoSeparators(items: string[], separator: string): { title: string | undefined, rulesBlock: string[], daresBlock: string[] } {
+    let titleStr: string | undefined;
+    let rulesContent: string[] = []; 
+    let daresContent: string[] = []; 
+
+    const stringItems = items.map(item => String(item).trim()).filter(s => s !== '');
+
+    console.log(`HELPER: Initial stringItems for parseItemsWithTwoSeparators (trimmed, non-empty):`, JSON.stringify(stringItems));
+
+    if (stringItems.length === 0) {
+        console.log(`HELPER: Input items array is empty after trimming.`);
+        return { title: undefined, rulesBlock: [], daresBlock: [] };
+    }
+    
+    // This branch is for when the input 'items' is a single string that itself contains separators.
+    // This is less common for this helper now, as plain text uses direct split.
+    // However, it could be relevant if a JSON array contains a single long string with separators.
+    if (stringItems.length === 1 && stringItems[0].includes(separator)) {
+        const singleItemContent = stringItems[0];
+        console.log(`HELPER: Single item found containing separator(s): "${singleItemContent}"`);
+        const parts = singleItemContent.split(separator);
+        
+        titleStr = parts[0]?.trim();
+        if (titleStr === "") titleStr = undefined; 
+
+        if (parts.length > 1) { 
+            const rulesPart = parts[1]?.trim();
+            if (rulesPart) rulesContent = [rulesPart]; 
+        }
+        if (parts.length > 2) { 
+            const daresPart = parts[2]?.trim();
+            if (daresPart) daresContent = [daresPart]; 
+        }
+        console.log(`HELPER (Single-item split): Title: "${titleStr}", Rules Block: [${rulesContent.join('; ')}], Dares Block: [${daresContent.join('; ')}]`);
+    } else { // This branch is for when 'items' is an array of multiple strings, and "###" is one of those strings.
+        const firstSepIdx = stringItems.findIndex(item => item === separator);
+        if (firstSepIdx !== -1) {
+            titleStr = stringItems.slice(0, firstSepIdx).join(' ').trim(); 
+            if (titleStr === "") titleStr = undefined;
+
+            const itemsAfterFirst = stringItems.slice(firstSepIdx + 1);
+            const secondSepIdx = itemsAfterFirst.findIndex(item => item === separator);
+
+            if (secondSepIdx !== -1) {
+                rulesContent = itemsAfterFirst.slice(0, secondSepIdx); 
+                daresContent = itemsAfterFirst.slice(secondSepIdx + 1); 
+            } else {
+                rulesContent = itemsAfterFirst; 
+            }
+        } else { // No separator found in multi-item array
+            if (stringItems.length > 0) {
+                titleStr = stringItems[0]; 
+                rulesContent = stringItems.slice(1); 
+            }
+        }
+        console.log(`HELPER (Multi-item logic): Title: "${titleStr}", Rules Block Items: ${rulesContent.length}, Dares Block Items: ${daresContent.length}`);
+    }
+    
+    if (titleStr === separator) titleStr = undefined;
+
+    return {
+        title: titleStr || undefined,
+        rulesBlock: cleanStringArrayBasic(rulesContent), 
+        daresBlock: cleanStringArrayBasic(daresContent)  
+    };
+}
+
 
 export const generateGameViaWebhook = async (params: GameGenerationParams): Promise<GeneratedGame> => {
   if (!params.activity || params.activity.trim() === "") {
     throw new Error("Activity must be provided to generate a game.");
   }
 
-  let response: Response;
   try {
-    console.log("Sending to webhook. Payload:", JSON.stringify(params));
-    response = await fetch(GAME_GENERATOR_WEBHOOK_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(params),
-    });
-  } catch (networkError: any) {
-    console.error("Network error calling webhook:", networkError);
-    throw new Error(`Failed to connect to the game generator: ${networkError.message}. Please check your internet connection.`);
-  }
-
-  if (!response.ok) {
-    let errorDetails = `Webhook request failed with status: ${response.status}`;
+    let response: Response;
     try {
-      const errorText = await response.text();
-      if (errorText) {
-        errorDetails += ` - ${errorText}`;
-      }
-    } catch (e) {
-      // Ignore error from parsing response text if response is not ok
+      console.log("Sending to webhook. Payload:", JSON.stringify(params));
+      response = await fetch(GAME_GENERATOR_WEBHOOK_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(params),
+      });
+    } catch (networkError: any) {
+      console.error("Network error calling webhook:", networkError);
+      throw new Error(`Failed to connect to the game generator: ${networkError.message || String(networkError)}. Please check your internet connection.`);
     }
-    console.error(errorDetails);
-    throw new Error(errorDetails);
-  }
 
-  const responseText = await response.text();
-  let generatedGame: GeneratedGame | null = null;
-  let rawRules: string[] = [];
-  let rawDares: string[] = [];
-  let titleFromResponse: string | undefined;
-
-  // Attempt to parse as JSON first
-  try {
-    const parsedJson = JSON.parse(responseText);
-    titleFromResponse = parsedJson.title;
-
-    if (parsedJson && typeof parsedJson.title === 'string') {
-      if (Array.isArray(parsedJson.rules) && Array.isArray(parsedJson.dares)) {
-        // Ideal case: distinct rules and dares arrays
-        rawRules = parsedJson.rules.filter((rule: any) => typeof rule === 'string');
-        rawDares = parsedJson.dares.filter((dare: any) => typeof dare === 'string');
-        console.log("JSON PARSING: Found distinct 'rules' and 'dares' arrays.");
-      } else if (Array.isArray(parsedJson.rules)) {
-        // Case: Only a 'rules' array, check for "Dares" separator within it
-        console.log("JSON PARSING: Found 'rules' array, checking for 'Dares' separator keyword.");
-        const separatorIndex = parsedJson.rules.findIndex((item: any) => 
-          typeof item === 'string' && item.toLowerCase().trim() === DARE_SEPARATOR_KEYWORD
-        );
-
-        if (separatorIndex !== -1) {
-          rawRules = parsedJson.rules.slice(0, separatorIndex).filter((rule: any) => typeof rule === 'string');
-          rawDares = parsedJson.rules.slice(separatorIndex + 1).filter((dare: any) => typeof dare === 'string');
-          console.log(`JSON PARSING: 'Dares' keyword found at index ${separatorIndex}. Split into ${rawRules.length} rules and ${rawDares.length} dares.`);
-        } else {
-          // No separator, all items in 'rules' are potential rules/dares mixed
-          rawRules = parsedJson.rules.filter((rule: any) => typeof rule === 'string');
-          console.log("JSON PARSING: No 'Dares' keyword in 'rules' array. All items treated as potential rules/mixed content.");
+    if (!response.ok) {
+      let errorDetails = `Webhook request failed with status: ${response.status}`;
+      try {
+        const errorText = await response.text();
+        if (errorText) {
+          errorDetails += ` - ${errorText}`;
         }
+      } catch (e) { /* Ignore */ }
+      console.error(errorDetails);
+      throw new Error(errorDetails);
+    }
+
+    const responseText = await response.text();
+    console.log("Webhook Raw Response Text:", responseText);
+
+    let titleStr: string | undefined;
+    let rawRulesBlockStrings: string[] = []; // Used for blocks that might contain newlines
+    let rawDaresBlockStrings: string[] = [];
+
+    let parsedIdeallyFromJson = false;
+
+    try {
+      const parsedJson = JSON.parse(responseText);
+      console.log("PARSING: Attempting JSON parse. Parsed object:", parsedJson);
+
+      if (parsedJson.title && typeof parsedJson.title === 'string' &&
+          Array.isArray(parsedJson.rules)
+      ) {
+          titleStr = parsedJson.title.trim();
+          // These are expected to be arrays of individual rule/dare strings
+          rawRulesBlockStrings = parsedJson.rules.map((item: any) => String(item).trim()).filter(Boolean); 
+          rawDaresBlockStrings = Array.isArray(parsedJson.dares) ? parsedJson.dares.map((item: any) => String(item).trim()).filter(Boolean) : [];
+          parsedIdeallyFromJson = true;
+          console.log("PARSING: Ideal JSON structure {title, rules, ?dares} direct parse.");
       } else {
-        console.warn("Parsed JSON, but 'rules' is not an array or structure is unexpected:", parsedJson);
+          let itemsForSeparatorParsing: string[] = [];
+          let potentialJsonTitle: string | undefined = undefined;
+
+          if (parsedJson.title && typeof parsedJson.title === 'string') {
+              potentialJsonTitle = parsedJson.title.trim();
+          }
+
+          if (Array.isArray(parsedJson)) {
+              itemsForSeparatorParsing = parsedJson.map(item => String(item));
+          } else if (parsedJson.content && Array.isArray(parsedJson.content)) { 
+              itemsForSeparatorParsing = parsedJson.content.map(item => String(item));
+          } else if (parsedJson.rules && Array.isArray(parsedJson.rules) && !parsedJson.title) {
+               // If only rules array is present, might contain title and separators
+              itemsForSeparatorParsing = parsedJson.rules.map(item => String(item));
+          }
+
+
+          if (itemsForSeparatorParsing.length > 0) {
+              console.log("PARSING: JSON with array-like content, passing to parseItemsWithTwoSeparators. Items:", JSON.stringify(itemsForSeparatorParsing));
+              const { title: sepParsedTitle, rulesBlock: sepParsedRules, daresBlock: sepParsedDares } = parseItemsWithTwoSeparators(itemsForSeparatorParsing, DARE_SEPARATOR_KEYWORD);
+              titleStr = potentialJsonTitle || sepParsedTitle;
+              rawRulesBlockStrings = sepParsedRules; // output of parseItemsWithTwoSeparators is already cleaned and items are distinct
+              rawDaresBlockStrings = sepParsedDares;
+          } else if (potentialJsonTitle) { 
+              titleStr = potentialJsonTitle;
+              // rawRulesBlockStrings and rawDaresBlockStrings remain empty arrays
+              console.log("PARSING: JSON with title, but no parsable rule/dare array. Rules/dares default to empty.");
+          } else {
+              console.log("PARSING: Unrecognized JSON structure, will fall to plain text mode after this catch block.");
+              throw new Error("Force plain text parsing for non-standard JSON."); 
+          }
       }
-    } else {
-      console.warn("Parsed JSON, but it does not match expected GeneratedGame structure (missing title):", parsedJson);
+    } catch (e: any) {
+        if (!parsedIdeallyFromJson) { 
+          console.log("PARSING: Plain text mode activated. Raw Response Text has been logged above.");
+          const textParts = responseText.split(DARE_SEPARATOR_KEYWORD);
+          console.log(`PARSING (Plain Text Direct Split by "###"): Found ${textParts.length} parts.`);
+
+          if (textParts.length === 1 && textParts[0].trim().toLowerCase() === "accepted") {
+              console.error("Webhook returned 'Accepted' instead of game data (plain text path).");
+              throw new Error("The game generator acknowledged the request but didn't return a game. Please check your Make.com scenario configuration or try again.");
+          }
+
+          if (textParts.length > 0) {
+              titleStr = textParts[0].trim();
+              console.log(`PARSING (Plain Text Direct Split): Tentative Title: "${titleStr}"`);
+          }
+          if (textParts.length > 1 && textParts[1].trim() !== "") {
+              rawRulesBlockStrings = [textParts[1]]; // Keep as a single block string for flatMap
+              console.log(`PARSING (Plain Text Direct Split): Tentative Raw Rules Block String:`, JSON.stringify(rawRulesBlockStrings));
+          }
+          if (textParts.length > 2 && textParts[2].trim() !== "") {
+              rawDaresBlockStrings = [textParts[2]]; // Keep as a single block string for flatMap
+              console.log(`PARSING (Plain Text Direct Split): Tentative Raw Dares Block String:`, JSON.stringify(rawDaresBlockStrings));
+          }
+          
+          // If no separators found, and not "accepted", titleStr is the whole text. Rules/dares are empty.
+          // The expansion logic below will handle splitting these blocks by newline.
+      } else {
+          // Error occurred after ideal JSON parsing (e.g., in map/filter), highly unlikely here
+          const errorMessage = (e instanceof Error) ? e.message : String(e);
+          console.error("Error during or after ideal JSON parsing attempt (unexpected):", errorMessage);
+      }
     }
-  } catch (parseError: any) {
-    console.log("Failed to parse JSON response from webhook. Attempting plain text parsing. Error:", parseError.message);
-    const trimmedResponseText = responseText.trim().toLowerCase();
-    if (trimmedResponseText === "accepted") {
-      console.error("Webhook returned 'Accepted' instead of game data.");
-      throw new Error("The game generator acknowledged the request but didn't return a game. Please check your Make.com scenario configuration or try again.");
+
+    console.log(`PRE-EXPANSION: Title: "${titleStr}"`);
+    console.log(`PRE-EXPANSION: Raw Rules Block Strings (${rawRulesBlockStrings.length}):`, JSON.stringify(rawRulesBlockStrings));
+    console.log(`PRE-EXPANSION: Raw Dares Block Strings (${rawDaresBlockStrings.length}):`, JSON.stringify(rawDaresBlockStrings));
+
+    // Expand blocks by newline. If already individual strings (e.g. from ideal JSON), split('\n') on "Rule1" makes ["Rule1"]
+    const expandedRules = rawRulesBlockStrings.flatMap(block => block.split('\n'));
+    const expandedDares = rawDaresBlockStrings.flatMap(block => block.split('\n'));
+
+    console.log(`POST-EXPANSION: Expanded Rules (${expandedRules.length}):`, JSON.stringify(expandedRules.slice(0,10)));
+    console.log(`POST-EXPANSION: Expanded Dares (${expandedDares.length}):`, JSON.stringify(expandedDares.slice(0,10)));
+
+    if (!titleStr || titleStr.trim() === "") {
+      titleStr = `Sipocalypse Game for '${params.activity}'`;
+      console.warn("No title found after parsing, using default.");
+    } else {
+      const singleActivity = params.activity.trim();
+      if (singleActivity){ 
+          const doubleActivityPattern = new RegExp(`^${escapeRegExp(singleActivity)}\\s+${escapeRegExp(singleActivity)}$`, 'i');
+          if (doubleActivityPattern.test(titleStr)) {
+            console.warn(`Sanitizing title: Detected doubled activity name "${titleStr}". Reducing to "${singleActivity}".`);
+            titleStr = singleActivity;
+          }
+      }
     }
 
-    // Plain text parsing logic
-    const lines = responseText.split('\n').map(line => line.trim()).filter(line => line !== "");
-    const titleParts: string[] = [];
-    let itemsStartedBasedOnNumbering = false;
-    const separatorIndex = lines.findIndex(line => line.toLowerCase() === DARE_SEPARATOR_KEYWORD);
+    const finalRulesArr = cleanAndDeduplicatePotentialRules(expandedRules);
+    const finalDaresArr = cleanAndDeduplicatePotentialRules(expandedDares);
 
-    const potentialItems: string[] = [];
+    console.log(`POST-CLEANING: Title: "${titleStr}"`);
+    console.log(`POST-CLEANING: Final Rules (${finalRulesArr.length}):`, JSON.stringify(finalRulesArr.slice(0,10)));
+    console.log(`POST-CLEANING: Final Dares (${finalDaresArr.length}):`, JSON.stringify(finalDaresArr.slice(0,10)));
+    console.log(`POST-CLEANING: Params: numberOfRules=${params.numberOfRules}, includeDares=${params.includeDares}`);
 
-    if (separatorIndex !== -1) {
-        console.log(`PLAIN TEXT: "Dares" keyword found at line index ${separatorIndex}.`);
-        // Everything before separator is title or rule
-        for(let i=0; i < separatorIndex; i++) {
-            const line = lines[i];
-            // Simplistic title detection: if it doesn't look like a numbered item, assume it's part of the title
-            if (!/^\s*\d+\.\s*/.test(line) && rawRules.length === 0) { // only add to title if rules haven't started
-                titleParts.push(line);
-            } else {
-                rawRules.push(line.replace(/^\s*\d+\.\s*/, '').trim()); // Add to rawRules, remove numbering
-            }
-        }
-        rawDares = lines.slice(separatorIndex + 1).map(line => line.replace(/^\s*\d+\.\s*/, '').trim()).filter(dare => dare !== ""); // Remove numbering from dares
-    } else {
-        console.log("PLAIN TEXT: No 'Dares' keyword found. Treating lines based on numbering or as mixed content.");
-        // No separator, try to distinguish title from items (rules/dares mixed)
-        for (const line of lines) {
-            if (!itemsStartedBasedOnNumbering && !/^\s*\d+\.\s*/.test(line)) {
-                titleParts.push(line);
-            } else {
-                itemsStartedBasedOnNumbering = true;
-                potentialItems.push(line.replace(/^\s*\d+\.\s*/, '').trim()); // Add to potentialItems, remove numbering
-            }
-        }
-        rawRules = potentialItems; // All potential items are initially considered rules if no separator
+    const finalGame: GeneratedGame = {
+      title: titleStr,
+      rules: finalRulesArr.slice(0, params.numberOfRules), 
+      dares: []
+    };
+
+    if (params.includeDares) {
+      if (finalDaresArr.length > 0) {
+        finalGame.dares = finalDaresArr;
+        console.log(`PROCESSING: Using explicitly parsed and cleaned dares. Count: ${finalDaresArr.length}`);
+      } else if (finalRulesArr.length > params.numberOfRules) {
+        // Only use rules overflow if no explicit dares were found AND includeDares is true
+        finalGame.dares = finalRulesArr.slice(params.numberOfRules);
+        console.log(`PROCESSING: No explicit dares. Using rules overflow as dares. Count: ${finalGame.dares.length}`);
+      } else {
+        console.log(`PROCESSING: IncludeDares is true, but no explicit dares found and no rules overflow.`);
+      }
     }
     
-    titleFromResponse = titleParts.join(' ').trim();
+     if (finalGame.rules.length === 0 && (!finalGame.dares || finalGame.dares.length === 0)) {
+       console.warn("No rules or dares were successfully parsed or generated. The game will be empty except for the title.");
+     }
+    
+    console.log("FINAL GAME OBJECT:", JSON.stringify(finalGame));
+    return finalGame;
+
+  } catch (error: any) {
+    const errorMessage = error?.message || (typeof error === 'string' ? error : "An unknown error occurred within the game generation service.");
+    console.error("SERVICE CRITICAL ERROR in generateGameViaWebhook:", errorMessage, error);
+    throw new Error(`Game Service Error: ${errorMessage}`);
   }
-
-  // Ensure title
-  if (!titleFromResponse) {
-    console.warn("No title found. Generating default title.");
-    titleFromResponse = `Sipocalypse Game for '${params.activity}'`;
-  } else if (params.activity && params.activity.trim().length > 0) {
-    // Title sanitization (example: remove duplicated activity name)
-    const singleActivity = params.activity.trim();
-    const doubleActivityPattern = new RegExp(`^${escapeRegExp(singleActivity)}\\s+${escapeRegExp(singleActivity)}$`, 'i');
-    if (doubleActivityPattern.test(titleFromResponse)) {
-      console.warn(`Sanitizing title: Detected doubled activity name "${titleFromResponse}". Reducing to "${singleActivity}".`);
-      titleFromResponse = singleActivity;
-    }
-  }
-
-  // Construct final game object
-  generatedGame = {
-    title: titleFromResponse,
-    rules: [],
-    dares: []
-  };
-
-  console.log(`PRE-PROCESSING: Raw Rules (${rawRules.length}):`, JSON.stringify(rawRules.slice(0,5)));
-  console.log(`PRE-PROCESSING: Raw Dares (${rawDares.length}):`, JSON.stringify(rawDares.slice(0,5)));
-  console.log(`PRE-PROCESSING: Params: numberOfRules=${params.numberOfRules}, includeDares=${params.includeDares}`);
-
-  // Populate rules, capped by numberOfRules
-  generatedGame.rules = rawRules.slice(0, params.numberOfRules);
-
-  // Populate dares if requested
-  if (params.includeDares) {
-    // If rawDares is already populated (e.g. from "Dares" keyword or explicit JSON array), use it.
-    // Otherwise, if rawRules had more items than numberOfRules, those become dares.
-    if (rawDares.length > 0) {
-        generatedGame.dares = rawDares;
-        console.log(`PROCESSING: Using explicitly separated/provided rawDares. Count: ${generatedGame.dares.length}`);
-    } else if (rawRules.length > params.numberOfRules) {
-        generatedGame.dares = rawRules.slice(params.numberOfRules);
-        console.log(`PROCESSING: No explicit dares, taking dares from rules overflow. Count: ${generatedGame.dares.length}`);
-    } else {
-        generatedGame.dares = []; // No explicit dares and no overflow from rules
-        console.log(`PROCESSING: No explicit dares and no rules overflow. Dares empty.`);
-    }
-  } else {
-    generatedGame.dares = []; // Dares not requested
-    console.log("PROCESSING: Dares not requested. Dares set to empty.");
-  }
-  
-  // Final validation
-  if (!generatedGame.title || !Array.isArray(generatedGame.rules) || generatedGame.rules.length === 0) {
-    console.error("Constructed game is missing essential fields or has no rules:", generatedGame);
-    console.error("Original responseText snippet:", responseText.substring(0,300));
-    throw new Error("The game generator returned an incomplete or unparsable game structure. Try adjusting your options or rephrasing the activity.");
-  }
-  
-  console.log("FINAL GAME OBJECT:", JSON.stringify(generatedGame));
-  return generatedGame;
 };
