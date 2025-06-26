@@ -37,20 +37,20 @@ function parseItemsWithTwoSeparators(items, separator) {
         return { title: undefined, rulesBlock: [], daresBlock: [] };
     }
     
-    if (stringItems.length === 1 && stringItems[0].includes(separator)) {
+    if (stringItems.length === 1 && typeof stringItems[0] === 'string' && stringItems[0].includes(separator)) {
         const singleItemContent = stringItems[0];
         console.log(`HELPER: Single item found containing separator(s): "${singleItemContent}"`);
         const parts = singleItemContent.split(separator);
         
-        titleStr = parts[0]?.trim();
+        titleStr = typeof parts[0] === 'string' ? parts[0].trim() : undefined;
         if (titleStr === "") titleStr = undefined; 
 
-        if (parts.length > 1) { 
-            const rulesPart = parts[1]?.trim();
+        if (parts.length > 1 && typeof parts[1] === 'string') { 
+            const rulesPart = parts[1].trim();
             if (rulesPart) rulesContent = [rulesPart]; 
         }
-        if (parts.length > 2) { 
-            const daresPart = parts[2]?.trim();
+        if (parts.length > 2 && typeof parts[2] === 'string') { 
+            const daresPart = parts[2].trim();
             if (daresPart) daresContent = [daresPart]; 
         }
         console.log(`HELPER (Single-item split): Title: "${titleStr}", Rules Block: [${rulesContent.join('; ')}], Dares Block: [${daresContent.join('; ')}]`);
@@ -124,7 +124,7 @@ export const generateGameViaWebhook = async (params) => {
     const responseText = await response.text();
     console.log("Webhook Raw Response Text:", responseText);
 
-    let titleStr;
+    let titleStr = ""; // Initialize to prevent undefined
     let rawRulesBlockStrings = []; 
     let rawDaresBlockStrings = [];
     let parsedIdeallyFromJson = false;
@@ -175,26 +175,32 @@ export const generateGameViaWebhook = async (params) => {
     } catch (e) {
         if (!parsedIdeallyFromJson) { 
           console.log("PARSING: Plain text mode activated. Raw Response Text has been logged above.");
-          const textParts = responseText.split(DARE_SEPARATOR_KEYWORD);
+          const textParts = responseText ? responseText.split(DARE_SEPARATOR_KEYWORD) : [];
           console.log(`PARSING (Plain Text Direct Split by "###"): Found ${textParts.length} parts.`);
 
-          if (textParts.length === 1 && textParts[0].trim().toLowerCase() === "accepted") {
+          if (textParts.length === 1 && typeof textParts[0] === 'string' && textParts[0].trim().toLowerCase() === "accepted") {
               console.error("Webhook returned 'Accepted' instead of game data (plain text path).");
               throw new Error("The game generator acknowledged the request but didn't return a game. Please check your Make.com scenario configuration or try again.");
           }
 
-          if (textParts.length > 0) {
+          if (textParts.length > 0 && typeof textParts[0] === 'string') {
               titleStr = textParts[0].trim();
               console.log(`PARSING (Plain Text Direct Split): Tentative Title: "${titleStr}"`);
+          } else {
+              titleStr = ""; // Ensure title is an empty string
           }
-          if (textParts.length > 1 && textParts[1].trim() !== "") {
+
+          if (textParts.length > 1 && typeof textParts[1] === 'string' && textParts[1].trim() !== "") {
               rawRulesBlockStrings = [textParts[1]]; 
               console.log(`PARSING (Plain Text Direct Split): Tentative Raw Rules Block String:`, JSON.stringify(rawRulesBlockStrings));
           }
-          if (textParts.length > 2 && textParts[2].trim() !== "") {
+          // else rawRulesBlockStrings remains []
+
+          if (textParts.length > 2 && typeof textParts[2] === 'string' && textParts[2].trim() !== "") {
               rawDaresBlockStrings = [textParts[2]]; 
               console.log(`PARSING (Plain Text Direct Split): Tentative Raw Dares Block String:`, JSON.stringify(rawDaresBlockStrings));
           }
+          // else rawDaresBlockStrings remains []
       } else {
           const errorMessage = (e instanceof Error) ? e.message : String(e);
           console.error("Error during or after ideal JSON parsing attempt (unexpected):", errorMessage);
@@ -205,8 +211,8 @@ export const generateGameViaWebhook = async (params) => {
     console.log(`PRE-EXPANSION: Raw Rules Block Strings (${rawRulesBlockStrings.length}):`, JSON.stringify(rawRulesBlockStrings));
     console.log(`PRE-EXPANSION: Raw Dares Block Strings (${rawDaresBlockStrings.length}):`, JSON.stringify(rawDaresBlockStrings));
     
-    const expandedRules = rawRulesBlockStrings.flatMap(block => block.split('\n'));
-    const expandedDares = rawDaresBlockStrings.flatMap(block => block.split('\n'));
+    const expandedRules = rawRulesBlockStrings.flatMap(block => (typeof block === 'string' ? block.split('\n') : []));
+    const expandedDares = rawDaresBlockStrings.flatMap(block => (typeof block === 'string' ? block.split('\n') : []));
 
     console.log(`POST-EXPANSION: Expanded Rules (${expandedRules.length}):`, JSON.stringify(expandedRules.slice(0,10)));
     console.log(`POST-EXPANSION: Expanded Dares (${expandedDares.length}):`, JSON.stringify(expandedDares.slice(0,10)));
