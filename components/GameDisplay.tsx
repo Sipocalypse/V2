@@ -103,7 +103,7 @@ const GameDisplay: React.FC<GameDisplayProps> = ({ game }) => {
 
       {game.dares && game.dares.length > 0 && (
         <div className="mb-8">
-          <h4 className="text-xl font-semibold mb-3 text-pink-300">Example Dares:</h4>
+          <h4 className="text-xl font-semibold mb-3 text-pink-300">Dares:</h4>
           <ol className="dares-list list-decimal list-inside space-y-2 text-gray-200 pl-4">
             {game.dares.map((dare, index) => (
               <li key={index} className="leading-relaxed">{dare}</li>

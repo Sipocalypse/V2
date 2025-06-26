@@ -94,7 +94,7 @@ const GameDisplay = ({ game }) => {
       ),
       game.dares && game.dares.length > 0 && (
         React.createElement("div", { className: "mb-8" },
-          React.createElement("h4", { className: "text-xl font-semibold mb-3 text-pink-300" }, "Example Dares:"),
+          React.createElement("h4", { className: "text-xl font-semibold mb-3 text-pink-300" }, "Dares:"),
           React.createElement("ol", { className: "dares-list list-decimal list-inside space-y-2 text-gray-200 pl-4" },
             game.dares.map((dare, index) => (
               React.createElement("li", { key: index, className: "leading-relaxed" }, dare)
