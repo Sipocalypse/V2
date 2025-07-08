@@ -12,7 +12,7 @@ const Hero = () => {
         React.createElement("img", {
           src: "https://i.imgur.com/Po8Zaen.png",
           alt: "Sipocalypse Logo",
-          className: "max-w-lg w-full h-auto mb-8 md:mb-10 mx-auto"
+          className: "max-w-lg w-full h-auto mb-8 md:mb-10 mx-auto animate-pulsate"
         }),
         React.createElement("p", { className: "font-luckiest text-custom-purple text-3xl md:text-4xl max-w-3xl mx-auto mb-10" },
           "Every activity is now a drinking game. You’re welcome."

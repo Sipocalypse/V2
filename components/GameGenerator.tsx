@@ -23,6 +23,7 @@ const GameGenerator: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [randomPlaceholder, setRandomPlaceholder] = useState<string>('');
+  const [showMascot, setShowMascot] = useState<boolean>(false);
 
 
   // State for cocktail recipe request
@@ -39,6 +40,10 @@ const GameGenerator: React.FC = () => {
       setRandomPlaceholder("e.g., At a funeral, In the gym..."); // Fallback
     }
   }, []);
+
+  useEffect(() => {
+    setShowMascot(options.activity.trim().length > 0);
+  }, [options.activity]);
 
 
   const resetCocktailForm = useCallback(() => {
@@ -157,9 +162,20 @@ const GameGenerator: React.FC = () => {
     }
   };
 
+  const mascotIsVisible = showMascot && !isLoading && !generatedGame;
 
   return (
-    <div className="max-w-3xl mx-auto p-6 md:p-8 bg-gray-900/60 rounded-xl shadow-2xl shadow-purple-500/10">
+    <div className="relative max-w-3xl mx-auto p-6 md:p-8 bg-gray-900/60 rounded-xl shadow-2xl shadow-purple-500/10">
+      <img
+        src="https://i.imgur.com/uUr8m0D.png"
+        alt="Sipocalypse Mascot"
+        className={`
+          block absolute w-32 h-32 -top-12 -right-8 md:w-48 md:h-48 md:-top-16 md:-right-24
+          transform transition-all duration-500 ease-in-out
+          ${mascotIsVisible ? 'scale-100 opacity-100 rotate-[15deg]' : 'scale-0 opacity-0 rotate-0'}
+          z-20 pointer-events-none
+        `}
+      />
       <h2 className="text-4xl font-luckiest text-center mb-8 bg-gradient-to-r from-purple-400 to-pink-500 text-transparent bg-clip-text">
         Game Generator
       </h2>

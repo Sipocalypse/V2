@@ -162,6 +162,15 @@
             // 'Elizeth' is defined here. For it to work, the font files must be loaded (see comments above).
             elizeth: ['Elizeth', 'Lexia', 'Viroqua', 'Jubilat', 'Poppins', 'sans-serif'], 
           },
+          animation: {
+            pulsate: 'pulsate 2.5s ease-in-out infinite',
+          },
+          keyframes: {
+            pulsate: {
+              '0%, 100%': { transform: 'scale(1)' },
+              '50%': { transform: 'scale(1.05)' },
+            }
+          },
         }
       }
     }

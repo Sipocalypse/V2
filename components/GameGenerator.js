@@ -23,6 +23,7 @@ const GameGenerator = () => {
   const [isLoading, setIsLoading] = React.useState(false); // Changed to React.useState
   const [error, setError] = React.useState(null); // Changed to React.useState
   const [randomPlaceholder, setRandomPlaceholder] = React.useState(''); // Changed to React.useState
+  const [showMascot, setShowMascot] = React.useState(false);
 
 
   // State for cocktail recipe request
@@ -39,6 +40,10 @@ const GameGenerator = () => {
       setRandomPlaceholder("e.g., At a funeral, In the gym..."); // Fallback if array is empty
     }
   }, []); // Empty dependency array means this runs once on mount
+
+  React.useEffect(() => {
+    setShowMascot(options.activity.trim().length > 0);
+  }, [options.activity]);
 
 
   const resetCocktailForm = React.useCallback(() => { // Changed to React.useCallback
@@ -149,8 +154,20 @@ const GameGenerator = () => {
     }
   };
 
+  const mascotIsVisible = showMascot && !isLoading && !generatedGame;
+
   return (
-    React.createElement("div", { className: "max-w-3xl mx-auto p-6 md:p-8 bg-gray-900/60 rounded-xl shadow-2xl shadow-purple-500/10" },
+    React.createElement("div", { className: "relative max-w-3xl mx-auto p-6 md:p-8 bg-gray-900/60 rounded-xl shadow-2xl shadow-purple-500/10" },
+      React.createElement("img", {
+        src: "https://i.imgur.com/uUr8m0D.png",
+        alt: "Sipocalypse Mascot",
+        className: `
+          block absolute w-32 h-32 -top-12 -right-8 md:w-48 md:h-48 md:-top-16 md:-right-24
+          transform transition-all duration-500 ease-in-out
+          ${mascotIsVisible ? 'scale-100 opacity-100 rotate-[15deg]' : 'scale-0 opacity-0 rotate-0'}
+          z-20 pointer-events-none
+        `
+      }),
       React.createElement("h2", { className: "text-4xl font-luckiest text-center mb-8 bg-gradient-to-r from-purple-400 to-pink-500 text-transparent bg-clip-text" },
         "Game Generator"
       ),
