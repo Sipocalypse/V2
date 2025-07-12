@@ -1,7 +1,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { GameOptions, GeneratedGame } from '../types';
-import { CHAOS_LEVELS, MIN_RULES, MAX_RULES, DEFAULT_RULES, FUNNY_ACTIVITY_EXAMPLES } from '../constants'; 
+import { CHAOS_LEVELS, MIN_RULES, MAX_RULES, DEFAULT_RULES, FUNNY_ACTIVITY_EXAMPLES, SOCIAL_LINKS } from '../constants'; 
 import { generateGameViaWebhook } from '../services/gameService'; // Updated import path and function name
 import GameDisplay from './GameDisplay';
 import Button from './Button';
@@ -30,6 +30,8 @@ const GameGenerator: React.FC = () => {
   const [cocktailEmail, setCocktailEmail] = useState<string>('');
   const [cocktailSubmissionStatus, setCocktailSubmissionStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [cocktailSubmissionError, setCocktailSubmissionError] = useState<string | null>(null);
+
+  const instagramLink = SOCIAL_LINKS.find(link => link.name === 'Instagram')?.href || 'https://www.instagram.com/sipocalypse.fun';
 
   useEffect(() => {
     // Set a random placeholder when the component mounts
@@ -166,16 +168,24 @@ const GameGenerator: React.FC = () => {
 
   return (
     <div className="relative max-w-3xl mx-auto p-6 md:p-8 bg-gray-900/60 rounded-xl shadow-2xl shadow-purple-500/10">
-      <img
-        src="https://i.imgur.com/uUr8m0D.png"
-        alt="Sipocalypse Mascot"
+      <a
+        href={instagramLink}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Follow Sipocalypse on Instagram"
         className={`
           block absolute w-32 h-32 -top-12 -right-8 md:w-48 md:h-48 md:-top-16 md:-right-24
           transform transition-all duration-500 ease-in-out
           ${mascotIsVisible ? 'scale-100 opacity-100 rotate-[15deg]' : 'scale-0 opacity-0 rotate-0'}
-          z-20 pointer-events-none
+          z-20
         `}
-      />
+      >
+        <img
+          src="https://i.imgur.com/0F9BW4r.png"
+          alt="Sipocalypse Mascot pointing to Instagram"
+          className="w-full h-full"
+        />
+      </a>
       <h2 className="text-4xl font-luckiest text-center mb-8 bg-gradient-to-r from-purple-400 to-pink-500 text-transparent bg-clip-text">
         Game Generator
       </h2>

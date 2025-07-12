@@ -51,6 +51,15 @@ export const SOCIAL_LINKS = [
       React.createElement("path", { d: "M14.5 9.5A3.5 3.5 0 0 0 11 6V5h2v1a1.5 1.5 0 0 1 1.5-1.5h1.36L15.5 8H17v3.5A3.5 3.5 0 0 1 13.5 15H12v-2h1.5a1.5 1.5 0 0 0 1.5-1.5V9.5Z"})
     ),
   },
+  {
+    name: 'X',
+    href: 'https://x.com/sipocalyps',
+    icon: React.createElement(
+      "svg", { xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" },
+      React.createElement("path", { d: "M18 6 6 18" }),
+      React.createElement("path", { d: "m6 6 12 12" })
+    ),
+  },
 ];
 
 export const APP_TITLE_PART1 = "SIP";
